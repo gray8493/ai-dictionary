@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase'; // Đảm bảo bạn đã tạo file này ở bước trước
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'; // Đảm bảo bạn đã tạo file này ở bước trước
 import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
@@ -19,6 +19,12 @@ export default function AuthPage() {
   // --- HANDLERS ---
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isSupabaseConfigured()) {
+      alert("Supabase chưa được cấu hình. Vui lòng kiểm tra file .env.local.");
+      return;
+    }
+
     setLoading(true);
 
     if (isLogin) {
@@ -51,6 +57,11 @@ export default function AuthPage() {
   };
 
   const handleGoogleLogin = async () => {
+    if (!isSupabaseConfigured()) {
+      alert("Supabase chưa được cấu hình. Vui lòng kiểm tra file .env.local.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
