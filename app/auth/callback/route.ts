@@ -9,22 +9,31 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/';
 
+  console.log('Auth callback:', { code: !!code, next, origin });
+
   if (code) {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host');
-      const isLocalEnv = process.env.NODE_ENV === 'development';
+      console.log('Exchange result:', { hasData: !!data, error: error?.message });
 
-      if (isLocalEnv) {
-        // We can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-        return NextResponse.redirect(`${origin}${next}`);
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      if (!error && data?.session) {
+        const forwardedHost = request.headers.get('x-forwarded-host');
+        const isLocalEnv = process.env.NODE_ENV === 'development';
+
+        if (isLocalEnv) {
+          return NextResponse.redirect(`${origin}${next}`);
+        } else if (forwardedHost) {
+          return NextResponse.redirect(`https://${forwardedHost}${next}`);
+        } else {
+          return NextResponse.redirect(`${origin}${next}`);
+        }
       } else {
-        return NextResponse.redirect(`${origin}${next}`);
+        console.error('OAuth exchange error:', error);
       }
+    } catch (err) {
+      console.error('Auth callback error:', err);
     }
   }
 
