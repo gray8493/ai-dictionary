@@ -109,49 +109,25 @@ export default function VocabularyPage() {
 
     setLoading(true);
     try {
-      // Using LibreTranslate API (free translation service)
-      const response = await fetch('https://libretranslate.de/translate', {
+      // Use our API route for translation
+      const response = await fetch('/api/translate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          q: translateInput,
-          source: 'en',
-          target: 'vi',
-          format: 'text'
-        }),
+        body: JSON.stringify({ text: translateInput }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setTranslation(data.translatedText);
+        setTranslation(data.translation);
         setResult(null);
       } else {
-        // Fallback: try another translation service
-        try {
-          const fallbackResponse = await fetch('/api/translate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ text: translateInput }),
-          });
-
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
-            setTranslation(fallbackData.translation);
-            setResult(null);
-          } else {
-            alert("Lỗi khi dịch văn bản!");
-          }
-        } catch (fallbackErr) {
-          alert("Lỗi kết nối dịch vụ dịch!");
-        }
+        alert("Lỗi khi dịch văn bản!");
       }
     } catch (err) {
-      console.error(err);
-      alert("Lỗi kết nối!");
+      console.error("Translation error:", err);
+      alert("Lỗi kết nối dịch vụ dịch!");
     } finally {
       setLoading(false);
     }
