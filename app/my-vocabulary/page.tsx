@@ -1,14 +1,24 @@
 // src/app/my-vocabulary/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+
+interface VocabularyItem {
+  id: string;
+  word: string;
+  type: string;
+  meaning: string;
+  date: string;
+  status: string;
+}
 
 /** * 1. LOCAL COMPONENT: NAV_ITEM
  */
 const NavItem = ({ href, label, active = false }: { href: string; label: string; active?: boolean }) => (
-  <Link 
-    href={href} 
+  <Link
+    href={href}
     className={`text-sm font-medium transition-colors ${active ? 'text-primary font-bold' : 'text-slate-600 dark:text-gray-400 hover:text-primary'}`}
   >
     {label}
@@ -18,12 +28,66 @@ const NavItem = ({ href, label, active = false }: { href: string; label: string;
 /** * MAIN PAGE: MY VOCABULARY MANAGEMENT
  */
 export default function MyVocabularyPage() {
-  // Giả lập danh sách từ vựng đã lưu
-  const [vocabList, setVocabList] = useState([
-    { id: 1, word: "Ephemeral", type: "adj", meaning: "Phù du, chóng tàn", date: "2024-03-20", status: "Learning" },
-    { id: 2, word: "Minimalism", type: "n", meaning: "Chủ nghĩa tối giản", date: "2024-03-18", status: "Mastered" },
-    { id: 3, word: "Aesthetic", type: "adj", meaning: "Thẩm mỹ", date: "2024-03-15", status: "Learning" },
-  ]);
+  const [vocabList, setVocabList] = useState<VocabularyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  // Check auth
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkAuth();
+  }, []);
+
+  // Fetch vocabularies từ database
+  useEffect(() => {
+    const fetchVocabularies = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          setError("Vui lòng đăng nhập để xem từ vựng của bạn");
+          setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('vocabularies')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          setError("Lỗi khi tải dữ liệu: " + error.message);
+        } else {
+          // Chuyển đổi data để phù hợp với table
+          const formattedData = data.map((item) => ({
+            id: item.id,
+            word: item.word,
+            type: item.ipa ? "pron" : "n", // Giả sử type từ ipa, có thể cải thiện
+            meaning: item.meaning,
+            date: new Date(item.created_at).toLocaleDateString('vi-VN'),
+            status: "Learning" // Mặc định là Learning
+          }));
+          setVocabList(formattedData);
+        }
+      } catch (err) {
+        setError("Lỗi không xác định");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVocabularies();
+  }, [user]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
@@ -42,7 +106,15 @@ export default function MyVocabularyPage() {
           <NavItem href="/practice" label="Luyện tập" />
         </nav>
         <div className="flex items-center gap-4">
-          <div className="bg-primary/10 text-primary p-2 rounded-full"><span className="material-symbols-outlined">person</span></div>
+          {user ? (
+            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+              Đăng xuất
+            </button>
+          ) : (
+            <Link href="/auth" className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90">
+              Đăng nhập
+            </Link>
+          )}
         </div>
       </header>
 
@@ -51,7 +123,13 @@ export default function MyVocabularyPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-black dark:text-white">Từ vựng của tôi</h1>
-            <p className="text-slate-500 dark:text-gray-400">Bạn đã lưu {vocabList.length} từ vựng.</p>
+            {loading ? (
+              <p className="text-slate-500 dark:text-gray-400">Đang tải...</p>
+            ) : error ? (
+              <p className="text-red-500 dark:text-red-400">{error}</p>
+            ) : (
+              <p className="text-slate-500 dark:text-gray-400">Bạn đã lưu {vocabList.length} từ vựng.</p>
+            )}
           </div>
           <div className="flex gap-2">
             <button className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 hover:opacity-90">
@@ -64,7 +142,7 @@ export default function MyVocabularyPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="md:col-span-2 relative">
             <span className="absolute left-3 top-3 text-slate-400 material-symbols-outlined">search</span>
-            <input 
+            <input
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="Tìm kiếm từ trong danh sách..."
             />
@@ -93,24 +171,44 @@ export default function MyVocabularyPage() {
               </tr>
             </thead>
             <tbody>
-              {vocabList.map((item) => (
-                <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-slate-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                  <td className="p-4 font-bold text-primary">{item.word}</td>
-                  <td className="p-4 text-slate-500 italic">({item.type})</td>
-                  <td className="p-4 dark:text-gray-300">{item.meaning}</td>
-                  <td className="p-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Mastered' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                      {item.status === 'Mastered' ? 'Đã thuộc' : 'Đang học'}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-2 text-slate-400 hover:text-primary transition-colors"><span className="material-symbols-outlined text-lg">edit</span></button>
-                      <button className="p-2 text-slate-400 hover:text-red-500 transition-colors"><span className="material-symbols-outlined text-lg">delete</span></button>
-                    </div>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-slate-500 dark:text-gray-400">
+                    Đang tải từ vựng...
                   </td>
                 </tr>
-              ))}
+              ) : error ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-red-500 dark:text-red-400">
+                    {error}
+                  </td>
+                </tr>
+              ) : vocabList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-slate-500 dark:text-gray-400">
+                    Chưa có từ vựng nào. Hãy tra cứu và lưu từ vựng!
+                  </td>
+                </tr>
+              ) : (
+                vocabList.map((item) => (
+                  <tr key={item.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-slate-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                    <td className="p-4 font-bold text-primary">{item.word}</td>
+                    <td className="p-4 text-slate-500 italic">({item.type})</td>
+                    <td className="p-4 dark:text-gray-300">{item.meaning}</td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.status === 'Mastered' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                        {item.status === 'Mastered' ? 'Đã thuộc' : 'Đang học'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button className="p-2 text-slate-400 hover:text-primary transition-colors"><span className="material-symbols-outlined text-lg">edit</span></button>
+                        <button className="p-2 text-slate-400 hover:text-red-500 transition-colors"><span className="material-symbols-outlined text-lg">delete</span></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

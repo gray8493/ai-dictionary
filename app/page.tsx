@@ -1,38 +1,7 @@
 // src/app/page.tsx
 import React from 'react';
 import Link from 'next/link'; // Import Link để chuyển trang không load lại
-
-// --- Local Components cho Trang Chủ ---
-
-const Navbar = () => (
-  <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200/80 dark:border-gray-700/50 px-6 sm:px-10 py-4">
-    <div className="flex items-center gap-4 text-slate-900 dark:text-white">
-      <div className="size-6 text-primary">
-        <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path>
-        </svg>
-      </div>
-      <h2 className="text-xl font-bold leading-tight tracking-tight">YourBrand</h2>
-    </div>
-    <div className="hidden lg:flex flex-1 justify-center gap-8">
-      <div className="flex items-center gap-9">
-        <Link href="/" className="text-slate-900 dark:text-gray-200 text-sm font-medium">Home</Link>
-        {/* Kết nối tới folder vocabulary */}
-        <Link href="/vocabulary" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm font-medium">Tìm Kiếm</Link>
-        <Link href="/practice" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm font-medium">Bài tập</Link>
-        <Link href="/ai-extract" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm font-medium">AI Extract</Link>
-        <Link href="/my-vocabulary" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm font-medium">Từ vựng</Link>
-      </div>
-    </div>
-    <div className="flex items-center justify-end">
-      <Link href="/auth">
-      <button className="flex min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-primary text-white text-sm font-bold">
-        Đăng nhập
-      </button>\
-      </Link>
-    </div>
-  </header>
-);
+import Navbar from '@/components/Navbar';
 
 const FeatureCard = ({ icon, title, desc }: { icon: string; title: string; desc: string }) => (
   <div className="flex flex-1 gap-4 rounded-lg border border-gray-200/80 dark:border-gray-700/50 bg-white/50 dark:bg-background-dark/50 p-6 flex-col">
@@ -44,6 +13,51 @@ const FeatureCard = ({ icon, title, desc }: { icon: string; title: string; desc:
       <p className="text-slate-600 dark:text-gray-400 text-sm font-normal">{desc}</p>
     </div>
   </div>
+);
+
+const Footer = () => (
+  <footer className="bg-white dark:bg-background-dark border-t border-gray-200/80 dark:border-gray-700/50 py-8 px-4 md:px-10 lg:px-20 xl:px-40">
+    <div className="max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="col-span-1 md:col-span-2">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="size-8 text-primary">
+              <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path>
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">YourBrand</h2>
+          </div>
+          <p className="text-slate-600 dark:text-gray-400 text-sm">
+            Khám phá phương pháp học tập hiệu quả với AI để nâng cao kỹ năng tiếng Anh của bạn.
+          </p>
+        </div>
+        <div>
+          <h3 className="text-slate-900 dark:text-white text-lg font-bold mb-4">Liên kết</h3>
+          <ul className="space-y-2">
+            <li><Link href="/" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Trang chủ</Link></li>
+            <li><Link href="/vocabulary" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Tìm Kiếm</Link></li>
+            <li><Link href="/practice" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Bài tập</Link></li>
+            <li><Link href="/ai-extract" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">AI Extract</Link></li>
+            <li><Link href="/my-vocabulary" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Từ vựng</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h3 className="text-slate-900 dark:text-white text-lg font-bold mb-4">Hỗ trợ</h3>
+          <ul className="space-y-2">
+            <li><a href="#" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Liên hệ</a></li>
+            <li><a href="#" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">FAQ</a></li>
+            <li><a href="/auth" className="text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200 text-sm">Đăng nhập</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-gray-200/80 dark:border-gray-700/50 mt-8 pt-8 text-center">
+        <p className="text-slate-600 dark:text-gray-400 text-sm">
+          © {new Date().getFullYear()} YourBrand. Tất cả quyền được bảo lưu.
+        </p>
+      </div>
+    </div>
+  </footer>
 );
 
 // --- Main Component ---
