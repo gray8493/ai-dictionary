@@ -64,11 +64,11 @@ const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) 
 
 // --- Main Component ---
 export default function VocabularyPage() {
-  const [mode, setMode] = useState<'word' | 'text'>('word');
+  const [mode, setMode] = useState<'word' | 'translate'>('word');
   const [search, setSearch] = useState("");
-  const [textInput, setTextInput] = useState("");
+  const [translateInput, setTranslateInput] = useState("");
   const [result, setResult] = useState<any>(null);
-  const [textResults, setTextResults] = useState<any>(null);
+  const [translation, setTranslation] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
   // 1. Logic tra cứu từ đơn
@@ -88,7 +88,7 @@ export default function VocabularyPage() {
             audioUrl: entry.phonetics.find((p: any) => p.audio !== "")?.audio || "",
             img: `https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500`
           });
-          setTextResults(null);
+          setTranslation("");
         } else {
           alert("Không tìm thấy từ này!");
         }
@@ -100,29 +100,54 @@ export default function VocabularyPage() {
     }
   };
 
-  // 2. Logic phân tích văn bản với AI
-  const handleTextAnalysis = async () => {
-    if (!textInput.trim()) {
-      alert("Vui lòng nhập văn bản để phân tích!");
+  // 2. Logic dịch văn bản
+  const handleTranslate = async () => {
+    if (!translateInput.trim()) {
+      alert("Vui lòng nhập văn bản để dịch!");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch('/api/analyze-text', {
+      // Using LibreTranslate API (free translation service)
+      const response = await fetch('https://libretranslate.de/translate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: textInput }),
+        body: JSON.stringify({
+          q: translateInput,
+          source: 'en',
+          target: 'vi',
+          format: 'text'
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setTextResults(data);
+        setTranslation(data.translatedText);
         setResult(null);
       } else {
-        alert("Lỗi khi phân tích văn bản!");
+        // Fallback: try another translation service
+        try {
+          const fallbackResponse = await fetch('/api/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text: translateInput }),
+          });
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            setTranslation(fallbackData.translation);
+            setResult(null);
+          } else {
+            alert("Lỗi khi dịch văn bản!");
+          }
+        } catch (fallbackErr) {
+          alert("Lỗi kết nối dịch vụ dịch!");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -159,38 +184,31 @@ export default function VocabularyPage() {
     }
   };
 
-  // 4. Lưu tất cả từ từ kết quả phân tích
-  const handleSaveAllFromText = async () => {
-    if (!textResults) return;
-
+  // 4. Lưu từ vựng từ kết quả tra cứu
+  const handleSaveWord = async (wordData: any) => {
     const { data: { user } } = await supabase.auth.getUser();
+
     if (!user) {
-      alert("Vui lòng đăng nhập!");
+      alert("Vui lòng đăng nhập để lưu từ vựng!");
       return;
     }
 
-    const allWords = [
-      ...(textResults.Easy || []),
-      ...(textResults.Medium || []),
-      ...(textResults.Hard || [])
-    ];
-
-    let successCount = 0;
-    for (const word of allWords) {
-      try {
-        await supabase.from('vocabularies').insert([{
+    const { error } = await supabase
+      .from('vocabularies')
+      .insert([
+        {
           user_id: user.id,
-          word: word.word,
-          ipa: word.ipa || '',
-          meaning: word.definition || word.meaning,
-        }]);
-        successCount++;
-      } catch (err) {
-        // Continue with other words
-      }
-    }
+          word: wordData.word,
+          ipa: wordData.ipa || '',
+          meaning: wordData.meaning,
+        }
+      ]);
 
-    alert(`Đã lưu ${successCount}/${allWords.length} từ!`);
+    if (error) {
+      alert("Lỗi: " + error.message);
+    } else {
+      alert("Đã lưu thành công!");
+    }
   };
 
   return (
@@ -212,17 +230,17 @@ export default function VocabularyPage() {
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                   }`}
                 >
-                  Tra cứu từ đơn
+                  Tra cứu từ vựng
                 </button>
                 <button
-                  onClick={() => setMode('text')}
+                  onClick={() => setMode('translate')}
                   className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'text'
+                    mode === 'translate'
                       ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                   }`}
                 >
-                  Phân tích văn bản
+                  Dịch văn bản
                 </button>
               </div>
             </div>
@@ -233,7 +251,7 @@ export default function VocabularyPage() {
                 <span className="absolute left-4 top-4 text-gray-400 material-symbols-outlined">search</span>
                 <input
                   className="w-full pl-12 pr-4 py-4 rounded-lg border-none ring-1 ring-gray-200 dark:ring-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-primary outline-none"
-                  placeholder="Nhập từ và ấn Enter..."
+                  placeholder="Nhập từ tiếng Anh và ấn Enter để tra cứu..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleWordSearch}
@@ -243,25 +261,25 @@ export default function VocabularyPage() {
               <div className="space-y-4">
                 <textarea
                   className="w-full h-32 p-4 rounded-lg border-none ring-1 ring-gray-200 dark:ring-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-primary outline-none resize-none"
-                  placeholder="Dán văn bản tiếng Anh vào đây để AI phân tích và trích xuất từ vựng..."
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Nhập văn bản hoặc đoạn văn tiếng Anh để dịch sang tiếng Việt..."
+                  value={translateInput}
+                  onChange={(e) => setTranslateInput(e.target.value)}
                 />
                 <div className="flex justify-center">
                   <button
-                    onClick={handleTextAnalysis}
-                    disabled={loading}
+                    onClick={handleTranslate}
+                    disabled={loading || !translateInput.trim()}
                     className="bg-primary text-white px-8 py-3 rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Đang phân tích...
+                        Đang dịch...
                       </>
                     ) : (
                       <>
-                        <span className="material-symbols-outlined">psychology</span>
-                        Phân tích với AI
+                        <span className="material-symbols-outlined">translate</span>
+                        Dịch sang tiếng Việt
                       </>
                     )}
                   </button>
@@ -275,57 +293,30 @@ export default function VocabularyPage() {
 
               {/* Word Search Results */}
               {mode === 'word' && result && (
-                <VocabCard {...result} onSave={handleSaveToDb} />
+                <VocabCard {...result} onSave={handleSaveWord} />
               )}
 
-              {/* Text Analysis Results */}
-              {mode === 'text' && textResults && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold dark:text-white">Từ vựng được trích xuất</h2>
-                    <button
-                      onClick={handleSaveAllFromText}
-                      className="bg-primary text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-all flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined">save</span>
-                      Lưu tất cả
-                    </button>
+              {/* Translation Results */}
+              {mode === 'translate' && translation && (
+                <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary">translate</span>
+                    <h2 className="text-xl font-bold dark:text-white">Kết quả dịch</h2>
                   </div>
-
-                  {['Easy', 'Medium', 'Hard'].map(level => (
-                    textResults[level] && textResults[level].length > 0 && (
-                      <div key={level} className="space-y-4">
-                        <h3 className={`text-lg font-bold px-3 py-1 rounded-full inline-block ${
-                          level === 'Easy' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
-                          level === 'Medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                        }`}>
-                          {level} ({textResults[level].length} từ)
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {textResults[level].map((item: any, index: number) => (
-                            <div key={index} className="flex flex-col gap-4 p-6 bg-white dark:bg-gray-800/50 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                              <div className="flex justify-between items-start">
-                                <h3 className="text-xl font-bold text-[#0d181b] dark:text-white">{item.word}</h3>
-                                <button className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                                  <span className="material-symbols-outlined text-[#4c869a] dark:text-gray-400 text-lg">volume_up</span>
-                                </button>
-                              </div>
-                              <p className="text-sm font-medium text-[#4c869a] dark:text-gray-400">{item.ipa}</p>
-                              <p className="text-base text-[#0d181b] dark:text-gray-300">{item.definition}</p>
-                              <button
-                                onClick={() => handleSaveToDb(item)}
-                                className="flex items-center justify-center gap-2 mt-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-full hover:opacity-90 transition-all"
-                              >
-                                <span className="material-symbols-outlined text-sm">add</span>
-                                Lưu từ
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tiếng Anh:</h3>
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{translateInput}</p>
                       </div>
-                    )
-                  ))}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Tiếng Việt:</h3>
+                      <div className="p-4 bg-primary/5 dark:bg-primary/10 rounded-lg border-2 border-primary/20">
+                        <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-medium">{translation}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -333,16 +324,16 @@ export default function VocabularyPage() {
               {mode === 'word' && !result && !loading && (
                 <>
                   <VocabCard
-                    word="Minimalism" ipa="/ˈmɪnɪməlɪzəm/" meaning="Chủ nghĩa tối giản"
-                    example="Minimalism is a style in art and design."
-                    img="https://images.unsplash.com/photo-1505330622279-bf7d7fc918f4?q=80&w=500"
-                    onSave={handleSaveToDb}
+                    word="Hello" ipa="/həˈloʊ/" meaning="Xin chào"
+                    example="Hello, how are you today?"
+                    img="https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500"
+                    onSave={handleSaveWord}
                   />
                   <VocabCard
-                    word="Aesthetic" ipa="/esˈθetɪk/" meaning="Có tính thẩm mỹ"
-                    example="The building has great aesthetic appeal."
+                    word="Thank you" ipa="/ˈθæŋk ju/" meaning="Cảm ơn"
+                    example="Thank you for your help."
                     img="https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500"
-                    onSave={handleSaveToDb}
+                    onSave={handleSaveWord}
                   />
                 </>
               )}
