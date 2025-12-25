@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import AuthGuard from '@/components/AuthGuard';
 
 interface VocabularyItem {
   id: string;
@@ -90,7 +91,8 @@ export default function MyVocabularyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
+    <AuthGuard>
+      <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
       {/* Header / Navbar */}
       <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-4">
@@ -214,5 +216,6 @@ export default function MyVocabularyPage() {
         </div>
       </main>
     </div>
+    </AuthGuard>
   );
 }

@@ -3,6 +3,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import AuthGuard from '@/components/AuthGuard';
 
 /** * LOCAL COMPONENT: EXERCISE CARD
  * Giúp tái sử dụng code cho 3 loại bài tập
@@ -28,7 +29,8 @@ const ExerciseCard = ({ href, icon, title, desc, colorClass, iconBg }: any) => (
 
 export default function PracticeMainPage() {
   return (
-    <div className="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased font-display">
+    <AuthGuard>
+      <div className="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased font-display">
       <div className="layout-container flex h-full grow flex-col">
         <div className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 flex flex-1 justify-center py-5">
           <div className="layout-content-container flex flex-col max-w-[800px] flex-1 w-full">
@@ -134,5 +136,6 @@ export default function PracticeMainPage() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   );
 }
