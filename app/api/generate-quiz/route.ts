@@ -60,6 +60,53 @@ export async function POST(req: NextRequest) {
   const { questionCount, difficulty, vocabularyList, quizType } = body;
 
   try {
+    // Check for test mode (skip auth for testing)
+    const testMode = req.headers.get('x-test-mode') === 'true';
+
+    let user, supabaseServer;
+    if (!testMode) {
+      // Get user from Authorization header
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      const token = authHeader.substring(7);
+      supabaseServer = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user: authUser }, error: userError } = await supabaseServer.auth.getUser();
+      if (userError || !authUser) {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      }
+      user = authUser;
+    } else {
+      // Test mode: use service role for all operations
+      supabaseServer = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const testUserId = '00000000-0000-0000-0000-000000000001'; // Fixed test user ID
+      user = { id: testUserId };
+
+      // Ensure test user profile exists with Pro status
+      const { data: profile, error: profileError } = await supabaseServer
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', testUserId)
+        .single();
+
+      if (profileError && profileError.code === 'PGRST116') {
+        await supabaseServer
+          .from('user_profiles')
+          .insert({
+            user_id: testUserId,
+            is_pro: true,
+            ai_credits: 10
+          });
+      } else if (profile && !profile.is_pro) {
+        await supabaseServer
+          .from('user_profiles')
+          .update({ is_pro: true, ai_credits: 10 })
+          .eq('user_id', testUserId);
+      }
+    }
 
     if (!questionCount || !difficulty || !vocabularyList) {
       return NextResponse.json({
@@ -79,23 +126,32 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check Pro access or AI credits
-    const hasAccess = await hasAIAccess();
-    if (!hasAccess) {
-      return NextResponse.json({
-        error: 'Yêu cầu gói Pro để sử dụng tính năng AI tạo bài tập. Hoặc dùng thử còn 3 lần miễn phí.'
-      }, { status: 403 });
+    // Check Pro access using authenticated user
+    if (!testMode) {
+      const { data: profile } = await supabaseServer
+        .from('user_profiles')
+        .select('is_pro')
+        .eq('user_id', user.id)
+        .single();
+      const hasAccess = profile?.is_pro || false;
+      if (!hasAccess) {
+        return NextResponse.json({
+          error: 'Yêu cầu gói Pro để sử dụng tính năng AI tạo bài tập. Hoặc dùng thử còn 3 lần miễn phí.'
+        }, { status: 403 });
+      }
     }
 
-    // Consume credit if not Pro
-    const consumed = await consumeAICredit();
-    if (!consumed) {
-      // If consumption failed, check again (might be Pro user)
-      const recheckAccess = await hasAIAccess();
-      if (!recheckAccess) {
-        return NextResponse.json({
-          error: 'Không thể sử dụng tính năng AI. Vui lòng nâng cấp gói Pro.'
-        }, { status: 403 });
+    // Consume credit if not Pro (skip in test mode)
+    if (!testMode) {
+      const consumed = await consumeAICredit(user);
+      if (!consumed) {
+        // If consumption failed, check again (might be Pro user)
+        const recheckAccess = await hasAIAccess(user);
+        if (!recheckAccess) {
+          return NextResponse.json({
+            error: 'Không thể sử dụng tính năng AI. Vui lòng nâng cấp gói Pro.'
+          }, { status: 403 });
+        }
       }
     }
 

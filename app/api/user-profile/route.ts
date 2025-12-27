@@ -108,17 +108,34 @@ export async function POST(req: NextRequest) {
       // Award XP logic
       const xpGained = xp || (difficulty === 'easy' ? 10 : difficulty === 'medium' ? 15 : 20);
 
-      const { error } = await supabase.rpc('increment_user_xp', {
-        user_id_param: user.id,
-        xp_amount: xpGained
-      });
+      // Get current profile data
+      const { data: profile, error: fetchError } = await supabase
+        .from('user_profiles')
+        .select('xp, weekly_xp')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Profile fetch error:', fetchError);
+        return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+      }
+
+      // Update XP directly (level will be auto-calculated by trigger)
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          xp: (profile?.xp || 0) + xpGained,
+          weekly_xp: (profile?.weekly_xp || 0) + xpGained,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('XP increment error:', error);
         return NextResponse.json({ error: 'Failed to award XP' }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, xp_gained: xpGained });
+      return NextResponse.json({ success: true, xpAwarded: xpGained });
     }
 
     if (action === 'update_display_name' && display_name) {

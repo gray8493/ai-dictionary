@@ -108,7 +108,7 @@ export default function MeaningQuizPage() {
       if (user) {
         fetchUserProfile();
         loadVocabulary();
-        const hasAccess = await hasAIAccess();
+        const hasAccess = await hasAIAccess(user);
         setIsProUser(hasAccess);
       }
     };
@@ -181,11 +181,19 @@ export default function MeaningQuizPage() {
 
     try {
       console.log('🚀 Calling AI API for quiz generation...');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('No session available for API call');
+        generateFallbackQuestions();
+        return;
+      }
+
       const vocabWords = vocabularyList.map(word => word.word);
       const response = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           questionCount: totalQuestions,
@@ -290,11 +298,19 @@ export default function MeaningQuizPage() {
     // Regenerate questions
     if (vocabularyList.length > 0) {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.error('No session available for API call');
+          generateFallbackQuestions();
+          return;
+        }
+
         const vocabWords = vocabularyList.map(word => word.word);
         const response = await fetch('/api/generate-quiz', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             questionCount: totalQuestions,

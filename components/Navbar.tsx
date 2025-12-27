@@ -126,7 +126,7 @@ export default function Navbar() {
 
         if (currentUser) {
           await fetchUserProfile();
-          const proStatus = await checkIsPro();
+          const proStatus = await checkIsPro(currentUser);
           if (mounted) setIsPro(proStatus);
         } else {
           setIsPro(false);
@@ -150,7 +150,7 @@ export default function Navbar() {
 
         if (currentUser) {
           fetchUserProfile();
-          const proStatus = await checkIsPro();
+          const proStatus = await checkIsPro(currentUser);
           if (mounted) setIsPro(proStatus);
         } else {
           setIsPro(false);

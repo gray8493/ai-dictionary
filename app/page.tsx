@@ -1,6 +1,10 @@
+"use client";
+
 // src/app/page.tsx
-import React from 'react';
-import Link from 'next/link'; // Import Link để chuyển trang không load lại
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import Navbar from '@/components/Navbar';
 
 const FeatureCard = ({ icon, title, desc }: { icon: string; title: string; desc: string }) => (
@@ -51,6 +55,59 @@ const Footer = () => (
 
 // --- Main Component ---
 export default function HomePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setLoading(false);
+    };
+
+    getUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleStartLearning = () => {
+    if (user) {
+      // Đã đăng nhập, chuyển đến vocabulary
+      router.push('/vocabulary');
+    } else {
+      // Chưa đăng nhập, chuyển đến auth
+      router.push('/auth');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+        <div className="layout-container flex h-full grow flex-col">
+          <div className="px-4 md:px-10 lg:px-20 xl:px-40 flex flex-1 justify-center py-5">
+            <div className="layout-content-container flex flex-col max-w-6xl w-full flex-1">
+              <Navbar />
+              <main className="flex-grow flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </main>
+              <Footer />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
       <div className="layout-container flex h-full grow flex-col">
@@ -62,9 +119,9 @@ export default function HomePage() {
                 <div className="flex flex-col gap-8 lg:w-1/2">
                   <h1 className="text-slate-900 dark:text-white text-4xl font-black leading-tight sm:text-5xl md:text-6xl">Học Tiếng Anh Thông Minh</h1>
                   <h2 className="text-slate-600 dark:text-gray-300 text-base font-normal sm:text-lg">Khám phá phương pháp học tập hiệu quả với AI.</h2>
-                  <Link href="/vocabulary" className="self-center lg:self-start flex min-w-[84px] items-center justify-center rounded-full h-12 px-6 bg-primary text-white text-base font-bold">
+                  <button onClick={handleStartLearning} className="self-center lg:self-start flex min-w-[84px] items-center justify-center rounded-full h-12 px-6 bg-primary text-white text-base font-bold hover:opacity-90">
                     Bắt đầu học
-                  </Link>
+                  </button>
                 </div>
                 <div className="w-full lg:w-1/2">
                    <div className="w-full bg-slate-200 aspect-video rounded-lg bg-cover bg-center" style={{backgroundImage: 'url("https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=1000")'}}></div>

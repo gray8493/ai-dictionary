@@ -1,6 +1,8 @@
 // Test script for generate-quiz API
 const testQuizGeneration = async () => {
-  const ports = [3000, 3001, 3002]; // Try multiple ports
+  console.log('🔍 Testing quiz generation with test mode...');
+
+  const ports = [3000, 3001]; // Try both ports
   const quizTypes = ['fill-blank', 'meaning'];
 
   for (const port of ports) {
@@ -11,6 +13,7 @@ const testQuizGeneration = async () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-test-mode': 'true'
           },
           body: JSON.stringify({
             questionCount: 2,

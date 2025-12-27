@@ -55,7 +55,7 @@ export default function AIQuizPage() {
       }
 
       // Check Pro access
-      const hasAccess = await hasAIAccess();
+      const hasAccess = await hasAIAccess(user);
       setIsProUser(hasAccess);
 
       setLoading(false);
@@ -73,10 +73,18 @@ export default function AIQuizPage() {
 
     setGenerating(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('No session available for API call');
+        alert('Vui lòng đăng nhập để tiếp tục!');
+        return;
+      }
+
       const response = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           questionCount,
