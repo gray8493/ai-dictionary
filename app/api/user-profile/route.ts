@@ -3,16 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const token = authHeader.replace('Bearer ', '');
 
+    const token = authHeader.substring(7);
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
@@ -21,62 +20,74 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
+    // Get user profile with subscription info
+    const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('*')
+      .select(`
+        id,
+        user_id,
+        xp,
+        level,
+        total_vocabularies,
+        mastered_vocabularies,
+        weekly_xp,
+        weekly_mastered,
+        created_at,
+        updated_at,
+        is_pro,
+        ai_credits,
+        display_name,
+        subscription_expires_at
+      `)
       .eq('user_id', user.id)
       .single();
 
-    if (error) {
-      // If table doesn't exist or profile doesn't exist, return default profile
-      if (error.code === 'PGRST116' || error.message?.includes('relation "user_profiles" does not exist')) {
-        const defaultProfile = {
-          id: null,
-          user_id: user.id,
-          xp: 0,
-          level: 1,
-          total_vocabularies: 0,
-          mastered_vocabularies: 0,
-          weekly_xp: 0,
-          weekly_mastered: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        return NextResponse.json({ success: true, data: defaultProfile });
-      }
-
-      console.error('Supabase error:', error);
-      return NextResponse.json({ error: 'Failed to fetch profile', details: error }, { status: 500 });
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = not found
+      console.error('Profile fetch error:', profileError);
+      return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    console.error('API error:', err);
-    return NextResponse.json({ error: 'Internal server error', details: err.message }, { status: 500 });
+    // Return profile or create default if not exists
+    const userProfile = profile || {
+      id: null,
+      user_id: user.id,
+      xp: 0,
+      level: 1,
+      total_vocabularies: 0,
+      mastered_vocabularies: 0,
+      weekly_xp: 0,
+      weekly_mastered: 0,
+      is_pro: false,
+      ai_credits: 3,
+      display_name: user.email?.split('@')[0] || 'User',
+      subscription_expires_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: userProfile
+    });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { action, xp, mastered_count, source, difficulty } = body;
-
-    if (!action) {
-      return NextResponse.json({ error: 'Action is required' }, { status: 400 });
-    }
-
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const token = authHeader.replace('Bearer ', '');
 
+    const token = authHeader.substring(7);
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
@@ -85,141 +96,52 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get current profile first
-    let { data: currentProfile, error: fetchError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const body = await req.json();
+    const { action, xp, difficulty, display_name } = body;
 
-    // If profile doesn't exist, create a default one
-    if (fetchError && (fetchError.code === 'PGRST116' || fetchError.message?.includes('user_profiles') || fetchError.message?.includes('does not exist'))) {
-      // Try to create profile using service role to bypass RLS, or fallback to anon key
-      const serviceSupabase = supabaseServiceKey
-        ? createClient(supabaseUrl, supabaseServiceKey)
-        : supabase;
+    if (action === 'practice_correct') {
+      // Award XP logic
+      const xpGained = xp || (difficulty === 'easy' ? 10 : difficulty === 'medium' ? 15 : 20);
 
-      const { data: newProfile, error: createError } = await serviceSupabase
-        .from('user_profiles')
-        .insert({
-          user_id: user.id,
-          xp: 0,
-          level: 1,
-          total_vocabularies: 0,
-          mastered_vocabularies: 0,
-          weekly_xp: 0,
-          weekly_mastered: 0
-        })
-        .select()
-        .single();
+      const { error } = await supabase.rpc('increment_user_xp', {
+        user_id_param: user.id,
+        xp_amount: xpGained
+      });
 
-      if (createError) {
-        console.error('Failed to create profile:', createError);
-        // Return default profile for now
-        currentProfile = {
-          id: null,
-          user_id: user.id,
-          xp: 0,
-          level: 1,
-          total_vocabularies: 0,
-          mastered_vocabularies: 0,
-          weekly_xp: 0,
-          weekly_mastered: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-      } else {
-        currentProfile = newProfile;
+      if (error) {
+        console.error('XP increment error:', error);
+        return NextResponse.json({ error: 'Failed to award XP' }, { status: 500 });
       }
-    } else if (fetchError) {
-      console.error('Supabase error:', fetchError);
-      return NextResponse.json({ error: 'Failed to fetch current profile', details: fetchError }, { status: 500 });
+
+      return NextResponse.json({ success: true, xp_gained: xpGained });
     }
 
-    let updateData: any = {};
-    let awardedXP = 0;
-
-    if (action === 'add_xp' && typeof xp === 'number') {
-      // Apply difficulty multiplier
-      let multiplier = 1;
-      if (difficulty === 'medium') multiplier = 1.5;
-      else if (difficulty === 'hard') multiplier = 2;
-
-      awardedXP = Math.floor(xp * multiplier);
-      updateData.xp = (currentProfile.xp || 0) + awardedXP;
-      updateData.weekly_xp = (currentProfile.weekly_xp || 0) + awardedXP;
-    } else if (action === 'update_mastered' && typeof mastered_count === 'number') {
-      updateData.mastered_vocabularies = mastered_count;
-      updateData.weekly_mastered = (currentProfile.weekly_mastered || 0) + mastered_count;
-    } else if (action === 'vocabulary_extracted' && typeof xp === 'number') {
-      // XP for extracting vocabulary from files (5 XP per word)
-      awardedXP = xp;
-      updateData.xp = (currentProfile.xp || 0) + awardedXP;
-      updateData.weekly_xp = (currentProfile.weekly_xp || 0) + awardedXP;
-      updateData.total_vocabularies = (currentProfile.total_vocabularies || 0) + 1;
-    } else if (action === 'practice_correct' && typeof xp === 'number') {
-      // XP for correct answers in practice (10 XP per correct answer with difficulty multiplier)
-      let multiplier = 1;
-      if (difficulty === 'medium') multiplier = 1.5;
-      else if (difficulty === 'hard') multiplier = 2;
-
-      awardedXP = Math.floor(xp * multiplier);
-      updateData.xp = (currentProfile.xp || 0) + awardedXP;
-      updateData.weekly_xp = (currentProfile.weekly_xp || 0) + awardedXP;
-    } else {
-      return NextResponse.json({ error: 'Invalid action or parameters' }, { status: 400 });
-    }
-
-    let data, error;
-
-    // Use service role for profile operations to bypass RLS if available, otherwise use user client
-    const serviceSupabase = supabaseServiceKey
-      ? createClient(supabaseUrl, supabaseServiceKey)
-      : supabase;
-
-    if (currentProfile.id) {
-      // Profile exists, update it
-      const result = await serviceSupabase
+    if (action === 'update_display_name' && display_name) {
+      // Update display name
+      const { error } = await supabase
         .from('user_profiles')
-        .update(updateData)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-      data = result.data;
-      error = result.error;
-    } else {
-      // Profile doesn't exist, create it
-      const result = await serviceSupabase
-        .from('user_profiles')
-        .insert({
-          user_id: user.id,
-          ...updateData
+        .update({
+          display_name: display_name.trim(),
+          updated_at: new Date().toISOString()
         })
-        .select()
-        .single();
-      data = result.data;
-      error = result.error;
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Display name update error:', error);
+        return NextResponse.json({ error: 'Failed to update display name' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, display_name });
     }
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return NextResponse.json({ error: 'Failed to update profile', details: error }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      data,
-      xpAwarded: awardedXP,
-      source
-    });
-  } catch (err: any) {
-    console.error('API error:', err);
-    return NextResponse.json({ error: 'Internal server error', details: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

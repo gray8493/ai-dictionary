@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
           weekly_xp,
           weekly_mastered,
           mastered_vocabularies,
-          total_vocabularies
+          total_vocabularies,
+          is_pro,
+          display_name
         `)
         .order('weekly_xp', { ascending: false })
         .order('weekly_mastered', { ascending: false })
@@ -43,7 +45,9 @@ export async function GET(req: NextRequest) {
           weekly_xp,
           weekly_mastered,
           mastered_vocabularies,
-          total_vocabularies
+          total_vocabularies,
+          is_pro,
+          display_name
         `)
         .order('xp', { ascending: false })
         .order('mastered_vocabularies', { ascending: false })
@@ -69,13 +73,14 @@ export async function GET(req: NextRequest) {
     const leaderboard = data.map((item: any, index: number) => ({
       rank: index + 1,
       user_id: item.user_id,
-      display_name: `User ${item.user_id.substring(0, 8)}`, // Use user ID prefix as display name
+      display_name: item.display_name || `User ${item.user_id.substring(0, 8)}`, // Use display_name or fallback to user ID prefix
       xp: item.xp,
       level: item.level,
       weekly_xp: item.weekly_xp,
       weekly_mastered: item.weekly_mastered,
       total_mastered: item.mastered_vocabularies,
-      total_vocabularies: item.total_vocabularies
+      total_vocabularies: item.total_vocabularies,
+      is_pro: item.is_pro || false
     }));
 
     return NextResponse.json({

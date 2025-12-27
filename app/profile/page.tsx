@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
 
@@ -9,6 +10,9 @@ export default function Profile() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const fetchUserProfile = async () => {
     try {
@@ -31,6 +35,39 @@ export default function Profile() {
       console.error('Error fetching user profile:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveDisplayName = async () => {
+    if (!newDisplayName.trim()) return;
+
+    setSavingName(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/user-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_display_name',
+          display_name: newDisplayName.trim()
+        }),
+      });
+
+      if (response.ok) {
+        setUserProfile((prev: any) => ({ ...prev, display_name: newDisplayName.trim() }));
+        setEditingName(false);
+      } else {
+        alert('Không thể cập nhật tên hiển thị');
+      }
+    } catch (error) {
+      alert('Lỗi khi cập nhật tên');
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -113,8 +150,56 @@ export default function Profile() {
             <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center">
                <span className="material-symbols-outlined text-6xl text-primary">{getRankIcon(userProfile.level)}</span>
             </div>
-            <h1 className="text-3xl font-black mb-1">{user.email?.split('@')[0] || 'User'}</h1>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">{getLevelName(userProfile.level)}</p>
+
+            <div className="mb-2">
+              {editingName ? (
+                <div className="flex items-center gap-2 justify-center">
+                  <input
+                    type="text"
+                    value={newDisplayName}
+                    onChange={(e) => setNewDisplayName(e.target.value)}
+                    className="text-3xl font-black text-center bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1 border-2 border-primary/50 focus:outline-none"
+                    placeholder="Nhập tên hiển thị"
+                    maxLength={20}
+                  />
+                  <button
+                    onClick={saveDisplayName}
+                    disabled={savingName}
+                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                  >
+                    {savingName ? '...' : '✓'}
+                  </button>
+                  <button
+                    onClick={() => setEditingName(false)}
+                    className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <h1 className="text-3xl font-black">{userProfile.display_name || user.email?.split('@')[0] || 'User'}</h1>
+                  <button
+                    onClick={() => {
+                      setEditingName(true);
+                      setNewDisplayName(userProfile.display_name || user.email?.split('@')[0] || 'User');
+                    }}
+                    className="p-1 text-slate-400 hover:text-primary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-lg">edit</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">{getLevelName(userProfile.level)}</p>
+              {userProfile.is_pro && (
+                <span className="px-2 py-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-black rounded-full shadow-sm">
+                  PRO
+                </span>
+              )}
+            </div>
 
             {/* Thanh XP lớn */}
             <div className="mt-8 space-y-2">
@@ -148,6 +233,46 @@ export default function Profile() {
             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
               <p className="text-slate-400 text-xs font-bold uppercase">Từ thuộc tuần</p>
               <p className="text-3xl font-black text-purple-500">{userProfile.weekly_mastered || 0}</p>
+            </div>
+          </div>
+
+          {/* Subscription Status */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+            <h3 className="font-bold text-lg mb-4">💎 Gói dịch vụ</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${userProfile.is_pro ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      {userProfile.is_pro ? 'Gói Pro' : 'Gói Free'}
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {userProfile.is_pro ? 'Tất cả tính năng AI không giới hạn' : '3 lần dùng AI miễn phí mỗi tháng'}
+                    </p>
+                  </div>
+                </div>
+                {userProfile.is_pro && userProfile.subscription_expires_at && (
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Hết hạn</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      {new Date(userProfile.subscription_expires_at).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {!userProfile.is_pro && (
+                <div className="text-center pt-2">
+                  <Link
+                    href="/upgrade"
+                    className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+                  >
+                    <span className="material-symbols-outlined">upgrade</span>
+                    Nâng cấp Pro
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 

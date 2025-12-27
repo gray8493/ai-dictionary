@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { hasAIAccess, consumeAICredit } from "@/lib/checkPro";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -9,6 +10,25 @@ export async function POST(req: Request) {
 
     if (!content) {
       return NextResponse.json({ error: "Không tìm thấy nội dung văn bản" }, { status: 400 });
+    }
+
+    // Check Pro access or AI credits
+    const hasAccess = await hasAIAccess();
+    if (!hasAccess) {
+      return NextResponse.json({
+        error: 'Yêu cầu gói Pro để sử dụng tính năng AI trích xuất từ vựng. Hoặc dùng thử còn 3 lần miễn phí.'
+      }, { status: 403 });
+    }
+
+    // Consume credit if not Pro
+    const consumed = await consumeAICredit();
+    if (!consumed) {
+      const recheckAccess = await hasAIAccess();
+      if (!recheckAccess) {
+        return NextResponse.json({
+          error: 'Không thể sử dụng tính năng AI. Vui lòng nâng cấp gói Pro.'
+        }, { status: 403 });
+      }
     }
 
     // BẮT BUỘC dùng gemini-flash-lite-latest cho tài liệu văn bản dài

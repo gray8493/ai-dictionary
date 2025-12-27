@@ -4,20 +4,27 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+import { hasAIAccess } from '@/lib/checkPro';
 
 export default function AIExtractPage() {
   const [loading, setLoading] = useState(false);
   const [vocabGroups, setVocabGroups] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('Easy');
   const [user, setUser] = useState<any>(null);
+  const [isProUser, setIsProUser] = useState<boolean>(false);
 
-  // Get user info
+  // Get user info and check Pro status
   useEffect(() => {
-    const getUser = async () => {
+    const getUserAndProStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        const hasAccess = await hasAIAccess();
+        setIsProUser(hasAccess);
+      }
     };
-    getUser();
+    getUserAndProStatus();
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,6 +92,25 @@ export default function AIExtractPage() {
 
     alert(`Đã lưu ${successCount}/${words.length} từ`);
   };
+
+  if (!isProUser) {
+    return (
+      <AuthGuard>
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 min-h-screen">
+          <div className="size-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-6">
+            <span className="material-symbols-outlined text-4xl">auto_awesome</span>
+          </div>
+          <h2 className="text-2xl font-black mb-2">Tính năng này dành cho bản Pro</h2>
+          <p className="text-slate-500 mb-8 max-w-sm">
+            Hãy nâng cấp tài khoản để sử dụng AI trích xuất từ vựng và tạo bài tập thông minh không giới hạn.
+          </p>
+          <Link href="/upgrade" className="px-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:scale-105 transition-all">
+            Nâng cấp ngay - $9.99/tháng
+          </Link>
+        </div>
+      </AuthGuard>
+    );
+  }
 
   return (
     <AuthGuard>

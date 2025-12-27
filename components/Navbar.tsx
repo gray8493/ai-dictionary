@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { checkIsPro } from '@/lib/checkPro';
 import type { User } from '@supabase/supabase-js';
 
 export default function Navbar() {
@@ -11,6 +12,7 @@ export default function Navbar() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isPro, setIsPro] = useState(false);
 
   const navLinks = [
     { name: 'Trang chủ', href: '/', icon: 'home' },
@@ -96,6 +98,8 @@ export default function Navbar() {
       setUser(user);
       if (user) {
         await fetchUserProfile();
+        const proStatus = await checkIsPro();
+        setIsPro(proStatus);
       }
       setLoading(false);
     };
@@ -103,10 +107,14 @@ export default function Navbar() {
     getUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) {
           fetchUserProfile();
+          const proStatus = await checkIsPro();
+          setIsPro(proStatus);
+        } else {
+          setIsPro(false);
         }
       }
     );
@@ -172,7 +180,14 @@ export default function Navbar() {
             </Link>
             {!loading && user && userProfile && !profileLoading && (
               <div className="hidden sm:flex flex-col items-end">
-                <span className="text-[10px] font-black text-slate-400 uppercase">LEVEL: {getLevelName(userProfile.level)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase">LEVEL: {getLevelName(userProfile.level)}</span>
+                  {isPro && (
+                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black rounded-full shadow-sm">
+                      PRO
+                    </span>
+                  )}
+                </div>
                 <div className="h-1.5 w-20 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                   <div style={{ width: `${Math.min(progress, 100)}%` }} className="h-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]"></div>
                 </div>
@@ -186,12 +201,12 @@ export default function Navbar() {
             </button>
           </div>
         ) : !loading ? (
-          <button
-            onClick={handleGoogleLogin}
-            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em]"
+          <Link
+            href="/auth"
+            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity"
           >
             <span className="truncate">Đăng nhập</span>
-          </button>
+          </Link>
         ) : null}
       </div>
     </header>

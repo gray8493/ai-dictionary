@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
+import { hasAIAccess, consumeAICredit } from '@/lib/checkPro';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -76,6 +77,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: 'Vocabulary list must be a non-empty array'
       }, { status: 400 });
+    }
+
+    // Check Pro access or AI credits
+    const hasAccess = await hasAIAccess();
+    if (!hasAccess) {
+      return NextResponse.json({
+        error: 'Yêu cầu gói Pro để sử dụng tính năng AI tạo bài tập. Hoặc dùng thử còn 3 lần miễn phí.'
+      }, { status: 403 });
+    }
+
+    // Consume credit if not Pro
+    const consumed = await consumeAICredit();
+    if (!consumed) {
+      // If consumption failed, check again (might be Pro user)
+      const recheckAccess = await hasAIAccess();
+      if (!recheckAccess) {
+        return NextResponse.json({
+          error: 'Không thể sử dụng tính năng AI. Vui lòng nâng cấp gói Pro.'
+        }, { status: 403 });
+      }
     }
 
     // Calculate XP per correct answer based on difficulty

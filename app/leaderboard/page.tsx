@@ -15,6 +15,7 @@ interface LeaderboardEntry {
   weekly_mastered: number;
   total_mastered: number;
   total_vocabularies: number;
+  is_pro: boolean;
 }
 
 /** * 1. LOCAL COMPONENT: NAV_ITEM
@@ -78,25 +79,21 @@ export default function LeaderboardPage() {
     <AuthGuard>
       <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
       {/* Header / Navbar */}
-      <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
+      <header className="grid grid-cols-3 items-center border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <div className="size-6 text-primary">
             <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
           </div>
           <h2 className="text-xl font-bold dark:text-white">VocabLearn</h2>
         </div>
-        <nav className="hidden md:flex gap-8">
+        <nav className="hidden lg:flex gap-8 justify-center">
           <NavItem href="/" label="Home" />
           <NavItem href="/vocabulary" label="Tra từ" />
           <NavItem href="/my-vocabulary" label="Từ của tôi" />
           <NavItem href="/practice" label="Luyện tập" />
           <NavItem href="/leaderboard" label="Bảng xếp hạng" active />
         </nav>
-        <div className="flex items-center gap-4">
-          <Link href="/auth" className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90">
-            Đăng nhập
-          </Link>
-        </div>
+        <div></div> {/* Empty div for balance */}
       </header>
 
       <main className="max-w-6xl mx-auto p-6 md:p-10">
@@ -191,7 +188,14 @@ export default function LeaderboardPage() {
                             {entry.display_name.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <span className="font-medium dark:text-gray-200">{entry.display_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium dark:text-gray-200">{entry.display_name}</span>
+                          {entry.is_pro && (
+                            <span className="px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black rounded-full shadow-sm">
+                              PRO
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="p-4 text-center">
