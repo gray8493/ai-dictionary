@@ -20,7 +20,7 @@ export default function AIExtractPage() {
       setUser(user);
 
       if (user) {
-        const hasAccess = await hasAIAccess();
+        const hasAccess = await hasAIAccess(user);
         setIsProUser(hasAccess);
       }
     };
@@ -120,24 +120,20 @@ export default function AIExtractPage() {
             <div className="layout-content-container flex flex-col w-full max-w-[960px] flex-1">
               <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e7f0f3] dark:border-gray-700/50 px-4 sm:px-6 lg:px-10 py-3">
                 <div className="flex items-center gap-4 text-[#0d181b] dark:text-white">
-                  <div className="size-6">
+                  <div className="size-6 text-primary">
                     <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                       <path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path>
                     </svg>
                   </div>
-                  <h2 className="text-[#0d181b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Trang AI</h2>
+                  <h2 className="text-[#0d181b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">VocabMaster</h2>
                 </div>
                 <div className="hidden md:flex flex-1 justify-end items-center gap-8">
                   <div className="flex items-center gap-9">
                     <Link href="/" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Home</Link>
-                    <Link href="/vocabulary" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Vocabulary</Link>
+                    <Link href="/vocabulary" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Tra từ</Link>
                     <Link href="/ai-extract" className="text-primary dark:text-primary text-sm font-bold leading-normal">AI Extract</Link>
-                    <Link href="/practice" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Practice</Link>
+                    <Link href="/practice" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Luyện tập</Link>
                   </div>
-                  <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90">
-                    <span className="truncate">Upgrade</span>
-                  </button>
-                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style={{backgroundImage: `url("https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=3b82f6&color=fff")`}}></div>
                 </div>
                 <button className="md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                   <span className="material-symbols-outlined text-[#0d181b] dark:text-white">menu</span>
