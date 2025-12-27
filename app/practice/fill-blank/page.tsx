@@ -17,9 +17,10 @@ const NavItem = ({ href, label, active = false }: { href: string; label: string;
 );
 
 interface FillBlankQuestion {
-  word: any;
+  word?: any;
   sentence: string;
   correctAnswer: string;
+  explanation?: string;
 }
 
 export default function FillInBlankPage() {
@@ -30,6 +31,13 @@ export default function FillInBlankPage() {
   const [userInput, setUserInput] = useState("");
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showCongratulation, setShowCongratulation] = useState(false);
+  const [congratulationData, setCongratulationData] = useState<{
+    correctCount: number;
+    totalQuestions: number;
+    xpEarned: number;
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -108,6 +116,44 @@ export default function FillInBlankPage() {
     checkAuth();
   }, []);
 
+  // Generate congratulation message based on results
+  const generateCongratulationMessage = (correctCount: number, totalQuestions: number, xpEarned: number) => {
+    let title = "";
+    let icon = "";
+    let encouragement = "";
+    let leaderboardHint = "";
+
+    const percentage = (correctCount / totalQuestions) * 100;
+
+    if (percentage === 100) {
+      title = "Hoàn hảo! 🎉";
+      icon = "🎊";
+      encouragement = "Bạn đã làm tuyệt vời! Không có lỗi nào cả.";
+    } else if (percentage >= 80) {
+      title = "Xuất sắc! 🔥";
+      icon = "🏆";
+      encouragement = "Bạn đã làm rất tốt! Chỉ cần cố gắng thêm một chút nữa.";
+    } else if (percentage >= 60) {
+      title = "Tốt lắm! 💪";
+      icon = "👍";
+      encouragement = "Bạn đang tiến bộ! Hãy tiếp tục luyện tập.";
+    } else {
+      title = "Cố gắng thêm nhé! 📚";
+      icon = "💪";
+      encouragement = "Đừng nản lòng! Mỗi lần luyện tập đều giúp bạn tiến bộ.";
+    }
+
+    leaderboardHint = "Hãy xem thứ hạng của bạn trên bảng xếp hạng!";
+
+    return {
+      title,
+      icon,
+      encouragement,
+      leaderboardHint,
+      message: `${encouragement} ${leaderboardHint}`
+    };
+  };
+
   // Award XP when quiz is completed
   useEffect(() => {
     if (showResults && user) {
@@ -122,7 +168,22 @@ export default function FillInBlankPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Lấy tất cả từ vựng của user
+      // First check if user selected specific words from practice page
+      const selectedWordsData = localStorage.getItem('selectedPracticeWords');
+      if (selectedWordsData) {
+        try {
+          const selectedWords = JSON.parse(selectedWordsData);
+          setVocabularyList(selectedWords);
+          console.log('Using selected words for fill-blank practice:', selectedWords.length);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error parsing selected words:', error);
+          // Fall back to all vocabulary
+        }
+      }
+
+      // Load all vocabulary as fallback
       const { data: vocabData } = await supabase
         .from('vocabularies')
         .select('*')
@@ -130,71 +191,147 @@ export default function FillInBlankPage() {
 
       if (vocabData && vocabData.length > 0) {
         setVocabularyList(vocabData);
-        // Generate quiz questions based on settings
-        generateQuizQuestions(vocabData);
+        console.log('Using all vocabulary for fill-blank practice:', vocabData.length);
       }
       setLoading(false);
     };
 
     loadVocabularyData();
-  }, [totalQuestions, difficulty]);
+  }, []);
+
+  // Generate AI quiz questions when vocabulary list changes or settings change
+  useEffect(() => {
+    const generateQuestions = async () => {
+      if (vocabularyList.length === 0) return;
+
+      try {
+        const vocabWords = vocabularyList.map(word => word.word);
+        const response = await fetch('/api/generate-quiz', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            questionCount: totalQuestions,
+            difficulty: difficulty,
+            vocabularyList: vocabWords
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.quiz.questions) {
+          const questions: FillBlankQuestion[] = result.quiz.questions.map((q: any) => ({
+            word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+            sentence: q.sentence,
+            correctAnswer: q.correct_answer,
+            explanation: q.explanation
+          }));
+
+          setQuizQuestions(questions);
+          setSelectedAnswers(new Array(questions.length).fill(""));
+        } else {
+          console.error('Quiz generation failed:', result.error);
+          // Fallback to basic questions if AI fails
+          generateFallbackQuestions();
+        }
+      } catch (error) {
+        console.error('Error generating AI quiz:', error);
+        // Fallback to basic questions
+        generateFallbackQuestions();
+      }
+    };
+
+    if (vocabularyList.length > 0) {
+      generateQuestions();
+    }
+  }, [vocabularyList, totalQuestions, difficulty]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
   };
 
-  // --- LOGIC: TẠO CÂU HỎI QUIZ ---
-  const generateQuizQuestions = (vocabList: any[]) => {
+  // --- LOGIC: TẠO CÂU HỎI QUIZ BẰNG AI ---
+  const generateAIQuizQuestions = async () => {
+    if (vocabularyList.length === 0) return;
+
+    try {
+      const vocabWords = vocabularyList.map(word => word.word);
+      const response = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionCount: totalQuestions,
+          difficulty: difficulty,
+          vocabularyList: vocabWords,
+          quizType: 'fill-blank'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.quiz.questions) {
+        const questions: FillBlankQuestion[] = result.quiz.questions.map((q: any) => ({
+          word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+          sentence: q.sentence,
+          correctAnswer: q.correct_answer,
+          explanation: q.explanation
+        }));
+
+        setQuizQuestions(questions);
+        setSelectedAnswers(new Array(questions.length).fill(""));
+      } else {
+        console.error('Quiz generation failed:', result.error);
+        // Fallback to basic questions if AI fails
+        generateFallbackQuestions();
+      }
+    } catch (error) {
+      console.error('Error generating AI quiz:', error);
+      // Fallback to basic questions
+      generateFallbackQuestions();
+    }
+  };
+
+  // Fallback function for basic questions if AI fails
+  const generateFallbackQuestions = () => {
     const questions: FillBlankQuestion[] = [];
-    const shuffledVocab = [...vocabList].sort(() => Math.random() - 0.5);
+    const shuffledVocab = [...vocabularyList].sort(() => Math.random() - 0.5);
 
-    // Sample sentences based on difficulty
-    const easySentences = [
-      "The weather is very ______ today.",
-      "I like to eat ______ food.",
-      "She has a ______ smile.",
-      "This book is very ______.",
-      "He is a ______ person."
-    ];
-
-    const mediumSentences = [
-      "The ______ of this painting is remarkable.",
+    // Better fallback sentences based on actual vocabulary
+    const fallbackTemplates = [
+      "I need to ______ my appointment for tomorrow.",
+      "The ______ of this book is very interesting.",
+      "Please ______ your seatbelt before driving.",
+      "She has a ______ personality that everyone likes.",
+      "This ______ is really important for our project.",
+      "Don't forget to ______ your phone when you leave.",
+      "The ______ weather makes me feel great.",
+      "I like to ______ my free time with friends.",
       "Please ______ your homework on time.",
-      "The ______ was extremely crowded.",
-      "She showed great ______ in the competition.",
-      "The ______ of the mountain was breathtaking."
+      "The ______ of the mountain is breathtaking."
     ];
-
-    const hardSentences = [
-      "The ______ implementation requires careful consideration.",
-      "His ______ demeanor masked his inner turmoil.",
-      "The ______ paradigm shift revolutionized the industry.",
-      "She demonstrated ______ proficiency in multiple disciplines.",
-      "The ______ conundrum perplexed even the experts."
-    ];
-
-    const sentenceBanks = {
-      easy: easySentences,
-      medium: mediumSentences,
-      hard: hardSentences
-    };
-
-    const selectedSentences = sentenceBanks[difficulty];
 
     for (let i = 0; i < Math.min(totalQuestions, shuffledVocab.length); i++) {
       const questionWord = shuffledVocab[i];
-      const sentence = selectedSentences[i % selectedSentences.length];
+      const template = fallbackTemplates[i % fallbackTemplates.length];
+
+      // Replace ______ with the word
+      const sentence = template.replace('______', questionWord.word);
 
       questions.push({
         word: questionWord,
         sentence: sentence,
-        correctAnswer: questionWord.word
+        correctAnswer: questionWord.word,
+        explanation: `Điền từ "${questionWord.word}" có nghĩa là "${questionWord.meaning}"`
       });
     }
 
     setQuizQuestions(questions);
     setSelectedAnswers(new Array(questions.length).fill(""));
+    console.log('✅ Generated fallback questions:', questions.length);
   };
 
   // --- LOGIC: XỬ LÝ CHỌN ĐÁP ÁN ---
@@ -223,19 +360,57 @@ export default function FillInBlankPage() {
     setUserInput("");
   };
 
-  const handleRestartQuiz = () => {
+  const handleRestartQuiz = async () => {
     setQuizStarted(false);
     setShowResults(false);
+    setShowCongratulation(false);
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
     setUserInput("");
-    generateQuizQuestions(vocabularyList);
+
+    // Regenerate questions
+    if (vocabularyList.length > 0) {
+      try {
+        const vocabWords = vocabularyList.map(word => word.word);
+        const response = await fetch('/api/generate-quiz', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            questionCount: totalQuestions,
+            difficulty: difficulty,
+            vocabularyList: vocabWords,
+            quizType: 'fill-blank'
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.quiz.questions) {
+          const questions: FillBlankQuestion[] = result.quiz.questions.map((q: any) => ({
+            word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+            sentence: q.sentence,
+            correctAnswer: q.correct_answer,
+            explanation: q.explanation
+          }));
+
+          setQuizQuestions(questions);
+          setSelectedAnswers(new Array(questions.length).fill(""));
+        } else {
+          generateFallbackQuestions();
+        }
+      } catch (error) {
+        console.error('Error regenerating quiz:', error);
+        generateFallbackQuestions();
+      }
+    }
   };
 
   const calculateScore = () => {
     return selectedAnswers.filter((answer, index) => {
       const question = quizQuestions[index];
-      return answer && answer.toLowerCase().trim() === question?.correctAnswer.toLowerCase().trim();
+      return answer && question?.correctAnswer && answer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
     }).length;
   };
 
@@ -270,7 +445,17 @@ export default function FillInBlankPage() {
         if (result.success) {
           // Refresh user profile to show updated XP
           fetchUserProfile();
-          console.log(`Chúc mừng! Bạn nhận được ${result.xpAwarded} XP!`);
+
+          // Generate congratulation message
+          const congratulation = generateCongratulationMessage(correctAnswers, quizQuestions.length, result.xpAwarded);
+
+          setCongratulationData({
+            correctCount: correctAnswers,
+            totalQuestions: quizQuestions.length,
+            xpEarned: result.xpAwarded,
+            message: congratulation.message
+          });
+          setShowCongratulation(true);
         }
       }
     } catch (err) {
@@ -395,7 +580,7 @@ export default function FillInBlankPage() {
   }
 
   // Results Screen
-  if (showResults) {
+  if (showResults && !showCongratulation) {
     const score = calculateScore();
     const percentage = Math.round((score / quizQuestions.length) * 100);
 
@@ -492,7 +677,7 @@ export default function FillInBlankPage() {
   const currentQuestion = quizQuestions[currentQuestionIndex];
   const currentAnswer = selectedAnswers[currentQuestionIndex];
   const isAnswered = currentAnswer !== "";
-  const isCorrect = isAnswered && currentAnswer.toLowerCase().trim() === currentQuestion?.correctAnswer.toLowerCase().trim();
+  const isCorrect = isAnswered && currentQuestion?.correctAnswer && currentAnswer.toLowerCase().trim() === currentQuestion.correctAnswer.toLowerCase().trim();
 
   return (
     <AuthGuard>
@@ -659,6 +844,62 @@ export default function FillInBlankPage() {
           </div>
         </div>
       </div>
+
+      {/* Congratulation Popup */}
+      {showCongratulation && congratulationData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
+          <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl border-4 border-primary text-center max-w-sm animate-bounce-in">
+            <div className="text-6xl mb-4">
+              {(() => {
+                const percentage = (congratulationData.correctCount / congratulationData.totalQuestions) * 100;
+                if (percentage === 100) return '🎊';
+                if (percentage >= 80) return '🏆';
+                if (percentage >= 60) return '👍';
+                return '💪';
+              })()}
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">
+              {(() => {
+                const percentage = (congratulationData.correctCount / congratulationData.totalQuestions) * 100;
+                if (percentage === 100) return 'Tuyệt vời!';
+                if (percentage >= 80) return 'Xuất sắc!';
+                if (percentage >= 60) return 'Tốt lắm!';
+                return 'Cố gắng thêm!';
+              })()}
+            </h2>
+
+            <div className="bg-primary/10 py-4 rounded-2xl mb-6">
+              <p className="text-sm font-bold text-primary uppercase tracking-widest">Bạn nhận được</p>
+              <p className="text-5xl font-black text-primary">+{congratulationData.xpEarned} XP</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {congratulationData.correctCount}/{congratulationData.totalQuestions} câu đúng
+              </p>
+            </div>
+
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
+              Điểm đã được cộng vào hồ sơ cá nhân và cập nhật trên Bảng xếp hạng!
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCongratulation(false);
+                  setShowResults(true);
+                }}
+                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl font-bold hover:scale-105 transition-transform"
+              >
+                Xem kết quả
+              </button>
+              <button
+                onClick={() => window.location.href = '/leaderboard'}
+                className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-transform"
+              >
+                Bảng xếp hạng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }

@@ -7,9 +7,11 @@ import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
 
 interface QuizQuestion {
-  word: any;
+  word?: any;
   options: string[];
   correctAnswer: string;
+  question: string;
+  explanation?: string;
 }
 
 export default function MeaningQuizPage() {
@@ -19,6 +21,13 @@ export default function MeaningQuizPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<(string | null)[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showCongratulation, setShowCongratulation] = useState(false);
+  const [congratulationData, setCongratulationData] = useState<{
+    correctCount: number;
+    totalQuestions: number;
+    xpEarned: number;
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Quiz settings
@@ -26,13 +35,29 @@ export default function MeaningQuizPage() {
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [quizStarted, setQuizStarted] = useState(false);
 
-  // Load user's vocabulary
+  // Load user's vocabulary (check for selected words first)
   useEffect(() => {
     const loadVocabulary = async () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // First check if user selected specific words from practice page
+      const selectedWordsData = localStorage.getItem('selectedPracticeWords');
+      if (selectedWordsData) {
+        try {
+          const selectedWords = JSON.parse(selectedWordsData);
+          setVocabularyList(selectedWords);
+          console.log('Using selected words for practice:', selectedWords.length);
+          setLoading(false);
+          return;
+        } catch (error) {
+          console.error('Error parsing selected words:', error);
+          // Fall back to all vocabulary
+        }
+      }
+
+      // Load all vocabulary as fallback
       const { data: vocabData } = await supabase
         .from('vocabularies')
         .select('*')
@@ -40,6 +65,7 @@ export default function MeaningQuizPage() {
 
       if (vocabData) {
         setVocabularyList(vocabData);
+        console.log('Using all vocabulary for practice:', vocabData.length);
       }
       setLoading(false);
     };
@@ -47,42 +73,95 @@ export default function MeaningQuizPage() {
     loadVocabulary();
   }, []);
 
-  // Generate quiz questions
-  const generateQuiz = () => {
+  // Generate congratulation message based on results (following the user's prompt format)
+  const generateCongratulationMessage = (correctCount: number, totalQuestions: number, xpEarned: number) => {
+    const percentage = (correctCount / totalQuestions) * 100;
+
+    let title = "";
+    let encouragement = "";
+    let leaderboardHint = "";
+
+    if (percentage === 100) {
+      title = "Hoàn hảo! 🎉";
+      encouragement = "Bạn đã làm tuyệt vời! Không có lỗi nào cả.";
+    } else if (percentage >= 80) {
+      title = "Xuất sắc! 🔥";
+      encouragement = "Bạn đã làm rất tốt! Chỉ cần cố gắng thêm một chút nữa.";
+    } else if (percentage >= 60) {
+      title = "Tốt lắm! 💪";
+      encouragement = "Bạn đang tiến bộ! Hãy tiếp tục luyện tập.";
+    } else {
+      title = "Cố gắng thêm nhé! 📚";
+      encouragement = "Đừng nản lòng! Mỗi lần luyện tập đều giúp bạn tiến bộ.";
+    }
+
+    leaderboardHint = "Bạn đang tiến gần hơn đến Top 10!";
+
+    return {
+      title,
+      encouragement,
+      leaderboardHint,
+      message: `${encouragement} ${leaderboardHint}`
+    };
+  };
+
+  // Generate AI-powered quiz questions
+  const generateQuiz = async () => {
     if (vocabularyList.length === 0) {
       alert('Bạn cần có từ vựng trước khi làm bài tập!');
       return;
     }
 
-    const shuffledVocab = [...vocabularyList].sort(() => Math.random() - 0.5);
-    const selectedWords = shuffledVocab.slice(0, Math.min(totalQuestions, vocabularyList.length));
+    try {
+      setLoading(true);
 
-    const questions: QuizQuestion[] = selectedWords.map(word => {
-      // Create distractors from other words
-      const distractors = vocabularyList
-        .filter(v => v.id !== word.id)
-        .map(v => v.meaning)
-        .slice(0, 3);
+      const vocabWords = vocabularyList.map(word => word.word);
+      const response = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionCount: totalQuestions,
+          difficulty: difficulty,
+          vocabularyList: vocabWords,
+          quizType: 'meaning'
+        }),
+      });
 
-      // Add fake meanings if not enough distractors
-      while (distractors.length < 3) {
-        distractors.push(`Nghĩa giả ${distractors.length + 1}`);
+      const result = await response.json();
+
+      if (result.success && result.quiz.questions) {
+        const questions: QuizQuestion[] = result.quiz.questions.map((q: any) => ({
+          word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          question: q.question,
+          explanation: q.explanation
+        }));
+
+        setQuizQuestions(questions);
+        setSelectedAnswers(new Array(questions.length).fill(null));
+        setCurrentQuestionIndex(0);
+        setQuizStarted(true);
+        setShowResults(false);
+        setShowCongratulation(false);
+        setCongratulationData(null);
+
+        // Show fallback notice if applicable
+        if (result.fallback) {
+          console.log('Using fallback quiz generation:', result.message);
+        }
+      } else {
+        alert('Không thể tạo bài tập. Vui lòng thử lại!');
+        console.error('Quiz generation failed:', result.error);
       }
-
-      const allOptions = [...distractors, word.meaning].sort(() => Math.random() - 0.5);
-
-      return {
-        word,
-        options: allOptions,
-        correctAnswer: word.meaning
-      };
-    });
-
-    setQuizQuestions(questions);
-    setSelectedAnswers(new Array(questions.length).fill(null));
-    setCurrentQuestionIndex(0);
-    setQuizStarted(true);
-    setShowResults(false);
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      alert('Có lỗi xảy ra khi tạo bài tập!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle answer selection
@@ -103,7 +182,8 @@ export default function MeaningQuizPage() {
 
   // Finish quiz and calculate results
   const finishQuiz = async () => {
-    setShowResults(true);
+    alert('🎯 Finishing quiz...'); // Debug alert
+    console.log('🎯 Finishing quiz...');
 
     // Calculate correct answers
     let correctCount = 0;
@@ -113,13 +193,17 @@ export default function MeaningQuizPage() {
       }
     });
 
+    console.log(`✅ Correct answers: ${correctCount}/${quizQuestions.length}`);
+
     const xpEarned = correctCount * (difficulty === 'easy' ? 10 : difficulty === 'medium' ? 15 : 20);
+    console.log(`💰 XP earned: ${xpEarned}`);
 
     // Award XP
     if (xpEarned > 0) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          console.log('🚀 Awarding XP to user...');
           await fetch('/api/user-profile', {
             method: 'POST',
             headers: {
@@ -132,11 +216,28 @@ export default function MeaningQuizPage() {
               difficulty
             }),
           });
+          console.log('✅ XP awarded successfully');
         }
       } catch (error) {
-        console.error('Error awarding XP:', error);
+        console.error('❌ Error awarding XP:', error);
       }
     }
+
+    // Generate congratulation message
+    const congratulation = generateCongratulationMessage(correctCount, quizQuestions.length, xpEarned);
+    console.log('🎊 Congratulation data:', congratulation);
+
+    const congratData = {
+      correctCount,
+      totalQuestions: quizQuestions.length,
+      xpEarned,
+      message: congratulation.message
+    };
+
+    console.log('📊 Setting congratulation data:', congratData);
+    setCongratulationData(congratData);
+    setShowCongratulation(true);
+    console.log('🎉 Popup should now be visible!');
   };
 
   // Calculate progress percentage
@@ -284,7 +385,7 @@ export default function MeaningQuizPage() {
                       </button>
                     </div>
                   </div>
-                ) : showResults ? (
+                ) : showResults && !showCongratulation && !showCongratulation ? (
                   /* Results Screen */
                   <div className="space-y-8">
                     <div className="text-center">
@@ -355,16 +456,18 @@ export default function MeaningQuizPage() {
                           </span>
                         </div>
                         <h2 className="text-xl font-bold leading-relaxed mb-4">
-                          Từ vựng này có nghĩa là gì?
+                          {currentQuestion?.question}
                         </h2>
-                        <div className="text-center">
-                          <h3 className="text-4xl font-black text-primary mb-2 uppercase">
-                            {currentQuestion?.word.word}
-                          </h3>
-                          <p className="text-slate-400 italic">
-                            {currentQuestion?.word.ipa}
-                          </p>
-                        </div>
+                        {currentQuestion?.word && (
+                          <div className="text-center mb-6">
+                            <h3 className="text-4xl font-black text-primary mb-2 uppercase">
+                              {currentQuestion.word.word}
+                            </h3>
+                            <p className="text-slate-400 italic">
+                              {currentQuestion.word.ipa}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Answer Options */}
@@ -427,6 +530,52 @@ export default function MeaningQuizPage() {
           </div>
         </div>
       </div>
+
+      {/* Congratulation Popup */}
+      {showCongratulation && congratulationData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
+          <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl border-4 border-primary text-center max-w-sm animate-bounce-in">
+            {/* Debug info */}
+            <div className="absolute top-2 right-2 text-xs bg-red-500 text-white px-2 py-1 rounded">
+              DEBUG: Popup visible
+            </div>
+            <div className="text-6xl mb-4">
+              {(() => {
+                const percentage = (congratulationData.correctCount / congratulationData.totalQuestions) * 100;
+                if (percentage === 100) return '🎊';
+                if (percentage >= 80) return '🏆';
+                if (percentage >= 60) return '👍';
+                return '💪';
+              })()}
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">
+              {generateCongratulationMessage(congratulationData.correctCount, congratulationData.totalQuestions, congratulationData.xpEarned).title}
+            </h2>
+
+            <div className="bg-primary/10 py-4 rounded-2xl mb-6">
+              <p className="text-sm font-bold text-primary uppercase tracking-widest">Bạn nhận được</p>
+              <p className="text-5xl font-black text-primary">+{congratulationData.xpEarned} XP</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {congratulationData.correctCount}/{congratulationData.totalQuestions} câu đúng
+              </p>
+            </div>
+
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
+              {generateCongratulationMessage(congratulationData.correctCount, congratulationData.totalQuestions, congratulationData.xpEarned).leaderboardHint}
+            </p>
+
+            <button
+              onClick={() => {
+                setShowCongratulation(false);
+                setShowResults(true);
+              }}
+              className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-transform"
+            >
+              Xem thứ hạng của tôi
+            </button>
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }

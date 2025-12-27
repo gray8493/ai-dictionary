@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // If profile doesn't exist, create a default one
     if (fetchError && (fetchError.code === 'PGRST116' || fetchError.message?.includes('user_profiles') || fetchError.message?.includes('does not exist'))) {
-      // Try to create profile using service role to bypass RLS
+      // Try to create profile using service role to bypass RLS, or fallback to anon key
       const serviceSupabase = supabaseServiceKey
         ? createClient(supabaseUrl, supabaseServiceKey)
         : supabase;
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
 
     let data, error;
 
-    // Always use service role for profile operations to bypass RLS
+    // Use service role for profile operations to bypass RLS if available, otherwise use user client
     const serviceSupabase = supabaseServiceKey
       ? createClient(supabaseUrl, supabaseServiceKey)
       : supabase;

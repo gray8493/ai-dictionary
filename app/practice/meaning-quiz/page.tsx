@@ -18,9 +18,11 @@ const NavItem = ({ href, label, active = false }: { href: string; label: string;
 );
 
 interface QuizQuestion {
-  word: any;
+  word?: any;
   options: string[];
   correctAnswer: string;
+  question?: string;
+  explanation?: string;
 }
 
 export default function MeaningQuizPage() {
@@ -103,10 +105,41 @@ export default function MeaningQuizPage() {
       setUser(user);
       if (user) {
         fetchUserProfile();
+        loadVocabulary();
       }
     };
     checkAuth();
   }, []);
+
+  // Load vocabulary with selected words check
+  const loadVocabulary = async () => {
+    // First check if user selected specific words from practice page
+    const selectedWordsData = localStorage.getItem('selectedPracticeWords');
+    if (selectedWordsData) {
+      try {
+        const selectedWords = JSON.parse(selectedWordsData);
+        setVocabularyList(selectedWords);
+        console.log('Using selected words for meaning quiz:', selectedWords.length);
+        return;
+      } catch (error) {
+        console.error('Error parsing selected words:', error);
+      }
+    }
+
+    // Load all vocabulary as fallback
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: vocabData } = await supabase
+      .from('vocabularies')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (vocabData && vocabData.length > 0) {
+      setVocabularyList(vocabData);
+      console.log('Using all vocabulary for meaning quiz:', vocabData.length);
+    }
+  };
 
   // Award XP when quiz is completed
   useEffect(() => {
@@ -115,68 +148,109 @@ export default function MeaningQuizPage() {
     }
   }, [showResults, user]);
 
-  // --- LOGIC: LẤY DỮ LIỆU TỪ DATABASE ---
+  // Set loading to false after vocabulary is loaded
   useEffect(() => {
-    const loadVocabularyData = async () => {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // 1. Lấy tất cả từ vựng của user
-      const { data: vocabData } = await supabase
-        .from('vocabularies')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (vocabData && vocabData.length > 0) {
-        setVocabularyList(vocabData);
-        // Generate quiz questions based on settings
-        generateQuizQuestions(vocabData);
-      }
+    if (vocabularyList.length >= 0) { // Changed from > 0 to >= 0 to handle empty arrays
       setLoading(false);
-    };
+    }
+  }, [vocabularyList]);
 
-    loadVocabularyData();
-  }, [totalQuestions, difficulty]);
+  // Generate AI quiz questions when vocabulary is loaded
+  useEffect(() => {
+    if (vocabularyList.length > 0 && !quizStarted) {
+      console.log('🤖 Generating AI quiz questions...');
+      generateAIQuizQuestions();
+    }
+  }, [vocabularyList, totalQuestions, difficulty]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
   };
 
-  // --- LOGIC: TẠO CÂU HỎI QUIZ ---
-  const generateQuizQuestions = (vocabList: any[]) => {
+  // --- LOGIC: TẠO CÂU HỎI QUIZ BẰNG AI ---
+  const generateAIQuizQuestions = async () => {
+    if (vocabularyList.length === 0) {
+      console.log('⚠️ No vocabulary available for quiz generation');
+      return;
+    }
+
+    try {
+      console.log('🚀 Calling AI API for quiz generation...');
+      const vocabWords = vocabularyList.map(word => word.word);
+      const response = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionCount: totalQuestions,
+          difficulty: difficulty,
+          vocabularyList: vocabWords,
+          quizType: 'meaning'
+        }),
+      });
+
+      console.log('📡 API Response status:', response.status);
+      const result = await response.json();
+      console.log('📋 API Result:', result);
+
+      if (result.success && result.quiz.questions) {
+        console.log('✅ Generated questions:', result.quiz.questions.length);
+        const questions: QuizQuestion[] = result.quiz.questions.map((q: any) => ({
+          word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          question: q.question,
+          explanation: q.explanation
+        }));
+
+        console.log('🎯 Final questions:', questions);
+        setQuizQuestions(questions);
+        setSelectedAnswers(new Array(questions.length).fill(null));
+      } else {
+        console.error('❌ Quiz generation failed:', result.error);
+        // Fallback to basic questions if AI fails
+        generateFallbackQuestions();
+      }
+    } catch (error) {
+      console.error('💥 Error generating AI quiz:', error);
+      // Fallback to basic questions
+      generateFallbackQuestions();
+    }
+  };
+
+  // Fallback function for basic questions if AI fails
+  const generateFallbackQuestions = () => {
+    console.log('🔄 Generating fallback questions...');
     const questions: QuizQuestion[] = [];
-    const shuffledVocab = [...vocabList].sort(() => Math.random() - 0.5);
+    const shuffledVocab = [...vocabularyList].sort(() => Math.random() - 0.5);
 
     for (let i = 0; i < Math.min(totalQuestions, shuffledVocab.length); i++) {
       const questionWord = shuffledVocab[i];
 
-      // Tạo phương án nhiễu dựa trên độ khó
-      let distractorCount = 3;
-      if (difficulty === 'easy') distractorCount = 2;
-      if (difficulty === 'hard') distractorCount = 4;
-
-      const distractors = vocabList
+      // Create distractors from other words' meanings
+      const distractors = vocabularyList
         .filter((v: any) => v.id !== questionWord.id)
         .map((v: any) => v.meaning)
-        .slice(0, distractorCount);
+        .slice(0, 3);
 
-      // Nếu không đủ từ khác, thêm nghĩa giả
-      while (distractors.length < distractorCount) {
-        distractors.push("Nghĩa giả " + (distractors.length + 1));
+      // Add fake meanings if not enough distractors
+      while (distractors.length < 3) {
+        distractors.push(`Nghĩa giả ${distractors.length + 1}`);
       }
 
-      // Trộn đáp án
       const allOptions = [...distractors, questionWord.meaning].sort(() => Math.random() - 0.5);
 
       questions.push({
         word: questionWord,
         options: allOptions,
-        correctAnswer: questionWord.meaning
+        correctAnswer: questionWord.meaning,
+        question: `Từ vựng "${questionWord.word}" có nghĩa là gì?`
       });
     }
 
+    console.log('✅ Generated fallback questions:', questions.length);
     setQuizQuestions(questions);
     setSelectedAnswers(new Array(questions.length).fill(null));
   };
@@ -203,12 +277,50 @@ export default function MeaningQuizPage() {
     setShowResults(false);
   };
 
-  const handleRestartQuiz = () => {
+  const handleRestartQuiz = async () => {
     setQuizStarted(false);
     setShowResults(false);
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
-    generateQuizQuestions(vocabularyList);
+
+    // Regenerate questions
+    if (vocabularyList.length > 0) {
+      try {
+        const vocabWords = vocabularyList.map(word => word.word);
+        const response = await fetch('/api/generate-quiz', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            questionCount: totalQuestions,
+            difficulty: difficulty,
+            vocabularyList: vocabWords,
+            quizType: 'meaning'
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.quiz.questions) {
+          const questions: QuizQuestion[] = result.quiz.questions.map((q: any) => ({
+            word: vocabularyList.find(w => w.word.toLowerCase() === q.word.toLowerCase()),
+            options: q.options,
+            correctAnswer: q.correct_answer,
+            question: q.question,
+            explanation: q.explanation
+          }));
+
+          setQuizQuestions(questions);
+          setSelectedAnswers(new Array(questions.length).fill(null));
+        } else {
+          generateFallbackQuestions();
+        }
+      } catch (error) {
+        console.error('Error regenerating quiz:', error);
+        generateFallbackQuestions();
+      }
+    }
   };
 
   const calculateScore = () => {
@@ -476,6 +588,14 @@ export default function MeaningQuizPage() {
   const currentQuestion = quizQuestions[currentQuestionIndex];
   const currentAnswer = selectedAnswers[currentQuestionIndex];
 
+  // Debug logging
+  console.log('📊 Quiz State:', {
+    totalQuestions: quizQuestions.length,
+    currentIndex: currentQuestionIndex,
+    currentQuestion,
+    selectedAnswers
+  });
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
@@ -565,11 +685,17 @@ export default function MeaningQuizPage() {
                     <span className="material-symbols-outlined text-[150px] text-blue-900">quiz</span>
                   </div>
 
-                  <p className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest mb-4">Từ vựng này có nghĩa là gì?</p>
-                  <h2 className="text-5xl font-black text-primary mb-2 tracking-tight uppercase">
-                    {currentQuestion?.word?.word}
-                  </h2>
-                  <p className="text-slate-400 font-medium italic mb-8">{currentQuestion?.word?.ipa}</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-widest mb-4">
+                    {currentQuestion?.question || "Từ vựng này có nghĩa là gì?"}
+                  </p>
+                  {currentQuestion?.word && (
+                    <>
+                      <h2 className="text-5xl font-black text-primary mb-2 tracking-tight uppercase">
+                        {currentQuestion.word.word}
+                      </h2>
+                      <p className="text-slate-400 font-medium italic mb-8">{currentQuestion.word.ipa}</p>
+                    </>
+                  )}
 
                   {/* DANH SÁCH ĐÁP ÁN */}
                   <div className="grid grid-cols-1 gap-3 text-left">
