@@ -3,15 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 export async function POST(req: NextRequest) {
+  let text = '';
+
   try {
-    const { text } = await req.json();
+    const body = await req.json();
+    text = body.text;
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
-    }
-
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json({ error: 'Translation service not available' }, { status: 500 });
     }
 
     const prompt = `Translate the following English text to Vietnamese. Provide only the translation, no additional text or explanations:
@@ -39,18 +38,59 @@ Vietnamese:`;
     });
 
     if (!response.ok) {
-      throw new Error('Translation service error');
+      const errorText = await response.text();
+      console.error('Gemini API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Translation service error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    const translation = data.candidates[0].content.parts[0].text.trim();
+    console.log('Gemini response:', data);
+
+    const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!translation) {
+      console.error('Invalid Gemini response structure:', data);
+      throw new Error('Invalid translation response');
+    }
 
     return NextResponse.json({ translation });
   } catch (error) {
     console.error('Translation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to translate text' },
-      { status: 500 }
-    );
+
+    // Fallback: Simple translation for common words
+    const fallbackTranslations: { [key: string]: string } = {
+      'hello': 'xin chào',
+      'world': 'thế giới',
+      'how': 'làm thế nào',
+      'are': 'là',
+      'you': 'bạn',
+      'today': 'hôm nay',
+      'good': 'tốt',
+      'morning': 'buổi sáng',
+      'thank': 'cảm ơn',
+      'please': 'làm ơn',
+      'yes': 'vâng',
+      'no': 'không',
+      'sorry': 'xin lỗi'
+    };
+
+    const words = text.toLowerCase().split(/\s+/);
+    const translatedWords = words.map(word => {
+      const cleanWord = word.replace(/[^a-z]/g, '');
+      return fallbackTranslations[cleanWord] || word;
+    });
+
+    const fallbackTranslation = translatedWords.join(' ');
+
+    console.log('Using fallback translation:', fallbackTranslation);
+
+    return NextResponse.json({
+      translation: fallbackTranslation,
+      note: 'This is a basic translation. For better results, set up Gemini API key.'
+    });
   }
 }

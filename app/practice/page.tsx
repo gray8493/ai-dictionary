@@ -1,9 +1,21 @@
 // src/app/practice/page.tsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+
+/** * LOCAL COMPONENT: NAV_ITEM
+ */
+const NavItem = ({ href, label, active = false }: { href: string; label: string; active?: boolean }) => (
+  <Link
+    href={href}
+    className={`text-sm font-medium transition-colors ${active ? 'text-primary font-bold' : 'text-slate-600 dark:text-gray-400 hover:text-primary'}`}
+  >
+    {label}
+  </Link>
+);
 
 /** * LOCAL COMPONENT: EXERCISE CARD
  * Giúp tái sử dụng code cho 3 loại bài tập
@@ -28,36 +40,133 @@ const ExerciseCard = ({ href, icon, title, desc, colorClass, iconBg }: any) => (
 );
 
 export default function PracticeMainPage() {
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) return;
+
+      const response = await fetch('/api/user-profile', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setUserProfile(result.data);
+      } else {
+        // If API fails, set default profile
+        setUserProfile({
+          id: null,
+          user_id: session.user.id,
+          xp: 0,
+          level: 1,
+          total_vocabularies: 0,
+          mastered_vocabularies: 0,
+          weekly_xp: 0,
+          weekly_mastered: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      // Set default profile on error
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setUserProfile({
+            id: null,
+            user_id: session.user.id,
+            xp: 0,
+            level: 1,
+            total_vocabularies: 0,
+            mastered_vocabularies: 0,
+            weekly_xp: 0,
+            weekly_mastered: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      } catch (sessionErr) {
+        console.error('Error getting session:', sessionErr);
+      }
+    }
+  };
+
+  // Check auth and fetch user profile
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      if (user) {
+        fetchUserProfile();
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
   return (
     <AuthGuard>
-      <div className="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased font-display">
-      <div className="layout-container flex h-full grow flex-col">
-        <div className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 flex flex-1 justify-center py-5">
-          <div className="layout-content-container flex flex-col max-w-[800px] flex-1 w-full">
-            
-            {/* HEADER SECTION */}
-            <header className="sticky top-4 z-50 flex items-center justify-between border border-solid border-slate-200 dark:border-slate-800 px-6 py-3 rounded-2xl bg-white/80 dark:bg-[#1A2C32]/80 backdrop-blur-md shadow-sm mb-8">
-              <div className="flex items-center gap-4">
-                <div className="size-8 text-primary">
-                  <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path clipRule="evenodd" d="M47.2426 24L24 47.2426L0.757355 24L24 0.757355L47.2426 24ZM12.2426 21H35.7574L24 9.24264L12.2426 21Z" fill="currentColor" fillRule="evenodd"></path>
-                  </svg>
+      <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
+        {/* Header / Navbar */}
+        <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <div className="size-6 text-primary">
+              <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
+            </div>
+            <h2 className="text-xl font-bold dark:text-white">VocabLearn</h2>
+          </div>
+          <nav className="hidden md:flex gap-8">
+            <NavItem href="/" label="Home" />
+            <NavItem href="/vocabulary" label="Tra từ" />
+            <NavItem href="/my-vocabulary" label="Từ của tôi" />
+            <NavItem href="/practice" label="Luyện tập" active />
+            <NavItem href="/leaderboard" label="Bảng xếp hạng" />
+          </nav>
+          <div className="flex items-center gap-4">
+            {user && userProfile && (
+              <div className="hidden md:flex items-center gap-4 mr-4">
+                <div className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 rounded-full">
+                  <span className="text-yellow-600 dark:text-yellow-400 text-sm">⭐</span>
+                  <span className="text-yellow-800 dark:text-yellow-200 font-bold">
+                    Level {userProfile.level}
+                  </span>
                 </div>
-                <h2 className="text-slate-800 dark:text-slate-100 text-lg font-bold tracking-tight">VocabMaster</h2>
-              </div>
-              <div className="hidden md:flex items-center gap-2">
-                <div className="h-2 w-32 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-1/3 rounded-full"></div>
+                <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                  <span className="text-blue-600 dark:text-blue-400 text-sm">⚡</span>
+                  <span className="text-blue-800 dark:text-blue-200 font-bold">
+                    {userProfile.xp} XP
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">350 XP</span>
               </div>
-              <div className="flex items-center gap-3">
-                <button className="flex items-center justify-center rounded-full size-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  <span className="material-symbols-outlined text-[20px]">settings</span>
-                </button>
-                <div className="bg-gray-300 rounded-full size-10 bg-cover shadow-sm" style={{backgroundImage: 'url("https://ui-avatars.com/api/?name=User")'}}></div>
-              </div>
-            </header>
+            )}
+            {user ? (
+              <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                Đăng xuất
+              </button>
+            ) : (
+              <Link href="/auth" className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90">
+                Đăng nhập
+              </Link>
+            )}
+          </div>
+        </header>
+
+        <div className="layout-container flex h-full grow flex-col">
+          <div className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 flex flex-1 justify-center py-5">
+            <div className="layout-content-container flex flex-col max-w-[800px] flex-1 w-full">
 
             <main className="flex flex-col gap-8 mb-20">
               <div>

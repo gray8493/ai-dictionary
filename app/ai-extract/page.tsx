@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
@@ -9,6 +9,16 @@ export default function AIExtractPage() {
   const [loading, setLoading] = useState(false);
   const [vocabGroups, setVocabGroups] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('Easy');
+  const [user, setUser] = useState<any>(null);
+
+  // Get user info
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,7 +111,7 @@ export default function AIExtractPage() {
                   <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90">
                     <span className="truncate">Upgrade</span>
                   </button>
-                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style={{backgroundImage: 'url("https://picsum.photos/40/40")'}}></div>
+                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style={{backgroundImage: `url("https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=3b82f6&color=fff")`}}></div>
                 </div>
                 <button className="md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                   <span className="material-symbols-outlined text-[#0d181b] dark:text-white">menu</span>
