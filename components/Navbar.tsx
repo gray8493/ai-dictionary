@@ -235,7 +235,7 @@ export default function Navbar() {
             )}
             <button
               onClick={handleLogout}
-              className="min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-red-500 text-white text-sm font-bold leading-normal tracking-[0.015em] hidden sm:flex"
+              className="min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-red-500 text-white text-sm font-bold leading-normal tracking-[0.015em]"
             >
               Đăng xuất
             </button>
