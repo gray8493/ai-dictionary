@@ -16,7 +16,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Trang chủ', href: '/', icon: 'home' },
-    { name: 'Từ vựng', href: '/vocabulary', icon: 'translate' },
+    { name: 'Tìm kiếm', href: '/vocabulary', icon: 'translate' },
     { name: 'Từ của tôi', href: '/my-vocabulary', icon: 'style' },
     { name: 'Luyện tập', href: '/practice', icon: 'fitness_center' },
     { name: 'AI Extract', href: '/ai-extract', icon: 'auto_awesome' },
@@ -24,13 +24,25 @@ export default function Navbar() {
   ];
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) alert(error.message);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        console.error('Login error:', error);
+        alert('Đăng nhập thất bại: ' + error.message);
+        setLoading(false);
+      }
+      // Don't set loading false here - page will redirect
+    } catch (err) {
+      console.error('Login failed:', err);
+      alert('Đăng nhập thất bại');
+      setLoading(false);
+    }
   };
 
   const fetchUserProfile = async () => {
@@ -93,26 +105,53 @@ export default function Navbar() {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        await fetchUserProfile();
-        const proStatus = await checkIsPro();
-        setIsPro(proStatus);
+      try {
+        console.log('Navbar - checking auth...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        if (error) {
+          console.error('Auth session error:', error);
+          setLoading(false);
+          return;
+        }
+
+        const currentUser = session?.user ?? null;
+        console.log('Navbar - user:', currentUser?.email || 'null');
+        setUser(currentUser);
+
+        if (currentUser) {
+          await fetchUserProfile();
+          const proStatus = await checkIsPro();
+          if (mounted) setIsPro(proStatus);
+        } else {
+          setIsPro(false);
+        }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
     };
 
     getUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
+        if (!mounted) return;
+
+        console.log('Auth state changed:', event, !!session?.user);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
           fetchUserProfile();
           const proStatus = await checkIsPro();
-          setIsPro(proStatus);
+          if (mounted) setIsPro(proStatus);
         } else {
           setIsPro(false);
         }
@@ -120,6 +159,7 @@ export default function Navbar() {
     );
 
     return () => {
+      mounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -201,12 +241,12 @@ export default function Navbar() {
             </button>
           </div>
         ) : !loading ? (
-          <Link
-            href="/auth"
-            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90 transition-opacity"
+          <button
+            onClick={handleGoogleLogin}
+            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90"
           >
             <span className="truncate">Đăng nhập</span>
-          </Link>
+          </button>
         ) : null}
       </div>
     </header>

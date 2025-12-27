@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+import { hasAIAccess } from '@/lib/checkPro';
 
 /** * LOCAL COMPONENT: NAV_ITEM
  */
@@ -35,6 +36,7 @@ export default function MeaningQuizPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isProUser, setIsProUser] = useState<boolean>(false);
 
   // Quiz settings
   const [totalQuestions, setTotalQuestions] = useState(5);
@@ -106,6 +108,8 @@ export default function MeaningQuizPage() {
       if (user) {
         fetchUserProfile();
         loadVocabulary();
+        const hasAccess = await hasAIAccess();
+        setIsProUser(hasAccess);
       }
     };
     checkAuth();
@@ -369,6 +373,25 @@ export default function MeaningQuizPage() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center dark:bg-background-dark dark:text-white">Đang tải từ vựng...</div>;
+
+  if (!isProUser) {
+    return (
+      <AuthGuard>
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-slate-50 dark:bg-background-dark min-h-screen">
+          <div className="size-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-6">
+            <span className="material-symbols-outlined text-4xl">auto_awesome</span>
+          </div>
+          <h2 className="text-2xl font-black mb-2">Tính năng này dành cho bản Pro</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm">
+            Hãy nâng cấp tài khoản để sử dụng AI tạo bài tập thông minh không giới hạn.
+          </p>
+          <Link href="/upgrade" className="px-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/30 hover:scale-105 transition-all">
+            Nâng cấp ngay - $9.99/tháng
+          </Link>
+        </div>
+      </AuthGuard>
+    );
+  }
 
   // Quiz Setup Screen
   if (!quizStarted) {
