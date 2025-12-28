@@ -13,6 +13,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navLinks = [
     { name: 'Trang chủ', href: '/', icon: 'home' },
@@ -116,20 +117,20 @@ export default function Navbar() {
 
         if (error) {
           console.error('Auth session error:', error);
-          setLoading(false);
+          if (mounted) setLoading(false);
           return;
         }
 
         const currentUser = session?.user ?? null;
         console.log('Navbar - user:', currentUser?.email || 'null');
-        setUser(currentUser);
+        if (mounted) setUser(currentUser);
 
         if (currentUser) {
           await fetchUserProfile();
           const proStatus = await checkIsPro(currentUser);
           if (mounted) setIsPro(proStatus);
         } else {
-          setIsPro(false);
+          if (mounted) setIsPro(false);
         }
       } catch (err) {
         console.error('Auth check failed:', err);
@@ -139,11 +140,6 @@ export default function Navbar() {
     };
 
     getUser();
-
-    // Timeout to ensure loading doesn't get stuck
-    const timeoutId = setTimeout(() => {
-      if (mounted) setLoading(false);
-    }, 3000);
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -168,7 +164,6 @@ export default function Navbar() {
     return () => {
       mounted = false;
       authListener.subscription.unsubscribe();
-      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -220,35 +215,55 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center justify-end gap-4">
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="lg:hidden p-2 text-slate-600 dark:text-gray-400 hover:text-primary"
+        >
+          <span className="material-symbols-outlined">
+            {isMobileMenuOpen ? 'close' : 'menu'}
+          </span>
+        </button>
+
         {!loading && user ? (
-          <div className="flex items-center gap-2">
-            <Link href="/profile" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
-              Hồ sơ
-            </Link>
-            <Link href="/leaderboard" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
-              Bảng xếp hạng
-            </Link>
-            {!loading && user && userProfile && !profileLoading && (
-              <div className="hidden sm:flex flex-col items-end">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase">LEVEL: {getLevelName(userProfile.level)}</span>
-                  {isPro && (
-                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[8px] font-black rounded-full shadow-sm">
-                      PRO
-                    </span>
-                  )}
+          <div className="flex items-center gap-4">
+            {userProfile && (
+              <div className="hidden md:flex items-center gap-4">
+                {user.user_metadata?.avatar_url && (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="Avatar"
+                    className="w-10 h-10 rounded-full border-2 border-primary"
+                  />
+                )}
+                <div className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 rounded-full">
+                  <span className="text-yellow-600 dark:text-yellow-400 text-sm">⭐</span>
+                  <span className="text-yellow-800 dark:text-yellow-200 font-bold">
+                    {userProfile.level}
+                  </span>
                 </div>
-                <div className="h-1.5 w-20 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div style={{ width: `${Math.min(progress, 100)}%` }} className="h-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]"></div>
+                <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+                  <span className="text-blue-600 dark:text-blue-400 text-sm">⚡</span>
+                  <span className="text-blue-800 dark:text-blue-200 font-bold">
+                    {userProfile.xp} XP
+                  </span>
                 </div>
               </div>
             )}
-            <button
-              onClick={handleLogout}
-              className="min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-red-500 text-white text-sm font-bold leading-normal tracking-[0.015em]"
-            >
-              Đăng xuất
-            </button>
+            <div className="flex items-center gap-2">
+              <Link href="/profile" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
+                Hồ sơ
+              </Link>
+              <Link href="/leaderboard" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
+                Bảng xếp hạng
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-red-500 text-white text-sm font-bold leading-normal tracking-[0.015em]"
+              >
+                Đăng xuất
+              </button>
+            </div>
           </div>
         ) : !loading ? (
           <Link
@@ -259,6 +274,66 @@ export default function Navbar() {
           </Link>
         ) : null}
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="lg:hidden fixed inset-0 top-[73px] bg-black/50 z-40"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="lg:hidden fixed inset-0 top-[73px] bg-white dark:bg-gray-900 z-50 border-t border-gray-200 dark:border-gray-700">
+            <nav className="flex flex-col py-4">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
+                  pathname === link.href
+                    ? 'text-primary bg-primary/5 border-r-2 border-primary'
+                    : 'text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">{link.icon}</span>
+                {link.name}
+              </Link>
+            ))}
+            {!loading && user && (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <span className="material-symbols-outlined text-lg">person</span>
+                  Hồ sơ
+                </Link>
+                <Link
+                  href="/leaderboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <span className="material-symbols-outlined text-lg">leaderboard</span>
+                  Bảng xếp hạng
+                </Link>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <span className="material-symbols-outlined text-lg">logout</span>
+                  Đăng xuất
+                </button>
+              </>
+            )}
+          </nav>
+          </div>
+        </>
+      )}
     </header>
   );
 }

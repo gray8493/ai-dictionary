@@ -11,7 +11,7 @@ async function testKey() {
     const data = await response.json();
     console.log('Available models:', data.models ? data.models.map(m => m.name) : data);
     // Test with gemini-flash-lite-latest
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
     const result = await model.generateContent('Hello');
     console.log('API key is valid:', result.response.text());
   } catch (error) {

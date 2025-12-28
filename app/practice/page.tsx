@@ -61,6 +61,9 @@ export default function PracticeMainPage() {
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [loading, setLoading] = useState(false);
+  const [hasWordsSelected, setHasWordsSelected] = useState(false);
+  const [selectedWordsCount, setSelectedWordsCount] = useState(0);
+  const [showExerciseSelector, setShowExerciseSelector] = useState(false);
 
   // Fetch user profile
   const fetchUserProfile = async () => {
@@ -129,6 +132,16 @@ export default function PracticeMainPage() {
       }
     };
     checkAuth();
+  }, []);
+
+  // Check for selected words on mount
+  useEffect(() => {
+    const selectedWordsData = localStorage.getItem('selectedPracticeWords');
+    if (selectedWordsData) {
+      const selectedWords = JSON.parse(selectedWordsData);
+      setHasWordsSelected(selectedWords.length > 0);
+      setSelectedWordsCount(selectedWords.length);
+    }
   }, []);
 
   const handleLogout = async () => {
@@ -210,7 +223,19 @@ export default function PracticeMainPage() {
     const selectedWordsList = vocabularyList.filter(word => selectedWords.has(word.id));
     // Store selected words in localStorage
     localStorage.setItem('selectedPracticeWords', JSON.stringify(selectedWordsList));
+    setHasWordsSelected(selectedWordsList.length > 0);
+    setSelectedWordsCount(selectedWordsList.length);
     setShowWordSelector(false);
+  };
+
+  // Check if there are selected words
+  const hasSelectedWords = () => {
+    const selectedWordsData = localStorage.getItem('selectedPracticeWords');
+    if (selectedWordsData) {
+      const selectedWords = JSON.parse(selectedWordsData);
+      return selectedWords.length > 0;
+    }
+    return false;
   };
 
   // Navigate to quiz with selected words
@@ -301,18 +326,21 @@ export default function PracticeMainPage() {
                       </div>
                       <h2 className="text-2xl font-black mb-2 tracking-tight">My Words</h2>
                       <div className="text-sm font-medium text-blue-50">
-                        <span className="px-2 py-0.5 rounded bg-white/20 text-white text-xs font-bold mr-2">142</span>
-                        words pending review
+                        <span className="px-2 py-0.5 rounded bg-white/20 text-white text-xs font-bold mr-2">{selectedWordsCount || 0}</span>
+                        {selectedWordsCount > 0 ? 'words selected for practice' : 'words pending review'}
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={openWordSelector}
-                    className="px-6 py-3 bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 ring-4 ring-white/20"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">library_add</span>
-                    Select from 'My Words'
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={openWordSelector}
+                      className="px-6 py-3 bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 ring-4 ring-white/20"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">library_add</span>
+                      {hasWordsSelected ? `Selected ${selectedWordsCount} words - Click to modify` : "Select from 'My Words'"}
+                    </button>
+
+                  </div>
                 </div>
               </div>
 
@@ -341,7 +369,7 @@ export default function PracticeMainPage() {
                   iconBg="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                 />
                 <ExerciseCard 
-                  href="/practice/fill-blank"
+                  onClick={() => startQuizWithSelectedWords('fill-blank')}
                   icon="edit_note"
                   title="Fill in Blank"
                   desc="Complete the sentence"
@@ -349,7 +377,7 @@ export default function PracticeMainPage() {
                   iconBg="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
                 />
                 <ExerciseCard 
-                  href="/practice/pronunciation"
+                  onClick={() => startQuizWithSelectedWords('pronunciation')}
                   icon="mic"
                   title="Pronunciation"
                   desc="Speak and get graded"
@@ -361,6 +389,59 @@ export default function PracticeMainPage() {
           </div>
         </div>
       </div>
+
+      {/* Exercise Selector Modal */}
+      {showExerciseSelector && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 dark:text-white">Chọn loại bài tập</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                  Chọn bài tập bạn muốn làm với {selectedWordsCount} từ đã chọn
+                </p>
+              </div>
+              <button
+                onClick={() => setShowExerciseSelector(false)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <ExerciseCard
+                  onClick={() => { startQuizWithSelectedWords('meaning-quiz'); setShowExerciseSelector(false); }}
+                  icon="quiz"
+                  title="Meaning Quiz"
+                  desc="Choose correct definitions"
+                  colorClass="blue"
+                  iconBg="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                />
+                <ExerciseCard
+                  onClick={() => { startQuizWithSelectedWords('fill-blank'); setShowExerciseSelector(false); }}
+                  icon="edit_note"
+                  title="Fill in Blank"
+                  desc="Complete the sentence"
+                  colorClass="purple"
+                  iconBg="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
+                />
+                <ExerciseCard
+                  onClick={() => { startQuizWithSelectedWords('pronunciation'); setShowExerciseSelector(false); }}
+                  icon="mic"
+                  title="Pronunciation"
+                  desc="Speak and get graded"
+                  colorClass="teal"
+                  iconBg="bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Word Selector Modal */}
       {showWordSelector && (
@@ -438,9 +519,27 @@ export default function PracticeMainPage() {
                       </span>
                       {selectedWords.size === vocabularyList.length ? 'Deselect All' : 'Select All'}
                     </button>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
-                      {selectedWords.size} of {vocabularyList.length} selected
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        {selectedWords.size} of {vocabularyList.length} selected
+                      </span>
+                      {selectedWords.size > 0 && (
+                        <button
+                          onClick={() => {
+                            const selectedWordsList = vocabularyList.filter(word => selectedWords.has(word.id));
+                            localStorage.setItem('selectedPracticeWords', JSON.stringify(selectedWordsList));
+                            setHasWordsSelected(selectedWordsList.length > 0);
+                            setSelectedWordsCount(selectedWordsList.length);
+                            setShowWordSelector(false);
+                            setShowExerciseSelector(true);
+                          }}
+                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-sm">play_arrow</span>
+                          Start Practice
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Word List */}
@@ -500,7 +599,13 @@ export default function PracticeMainPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={applySelectedWords}
+                  onClick={() => {
+                    const selectedWordsList = vocabularyList.filter(word => selectedWords.has(word.id));
+                    localStorage.setItem('selectedPracticeWords', JSON.stringify(selectedWordsList));
+                    setHasWordsSelected(selectedWordsList.length > 0);
+                    setSelectedWordsCount(selectedWordsList.length);
+                    startQuizWithSelectedWords('meaning-quiz');
+                  }}
                   disabled={selectedWords.size === 0}
                   className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                 >

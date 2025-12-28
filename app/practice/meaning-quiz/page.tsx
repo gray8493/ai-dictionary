@@ -33,6 +33,13 @@ export default function MeaningQuizPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<(string | null)[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showCongratulation, setShowCongratulation] = useState(false);
+  const [congratulationData, setCongratulationData] = useState<{
+    correctCount: number;
+    totalQuestions: number;
+    xpEarned: number;
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -98,6 +105,44 @@ export default function MeaningQuizPage() {
         console.error('Error getting session:', sessionErr);
       }
     }
+  };
+
+  // Generate congratulation message based on results
+  const generateCongratulationMessage = (correctCount: number, totalQuestions: number, xpEarned: number) => {
+    let title = "";
+    let icon = "";
+    let encouragement = "";
+    let leaderboardHint = "";
+
+    const percentage = (correctCount / totalQuestions) * 100;
+
+    if (percentage === 100) {
+      title = "Hoàn hảo! 🎉";
+      icon = "🎊";
+      encouragement = "Bạn đã làm tuyệt vời! Không có lỗi nào cả.";
+    } else if (percentage >= 80) {
+      title = "Xuất sắc! 🔥";
+      icon = "🏆";
+      encouragement = "Bạn đã làm rất tốt! Chỉ cần cố gắng thêm một chút nữa.";
+    } else if (percentage >= 60) {
+      title = "Tốt lắm! 💪";
+      icon = "👍";
+      encouragement = "Bạn đang tiến bộ! Hãy tiếp tục luyện tập.";
+    } else {
+      title = "Cố gắng thêm nhé! 📚";
+      icon = "💪";
+      encouragement = "Đừng nản lòng! Mỗi lần luyện tập đều giúp bạn tiến bộ.";
+    }
+
+    leaderboardHint = "Hãy xem thứ hạng của bạn trên bảng xếp hạng!";
+
+    return {
+      title,
+      icon,
+      encouragement,
+      leaderboardHint,
+      message: `${encouragement} ${leaderboardHint}`
+    };
   };
 
   // Check auth and fetch user profile
@@ -292,6 +337,7 @@ export default function MeaningQuizPage() {
   const handleRestartQuiz = async () => {
     setQuizStarted(false);
     setShowResults(false);
+    setShowCongratulation(false);
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
 
@@ -380,7 +426,17 @@ export default function MeaningQuizPage() {
         if (result.success) {
           // Refresh user profile to show updated XP
           fetchUserProfile();
-          console.log(`Chúc mừng! Bạn nhận được ${result.xpAwarded} XP!`);
+
+          // Generate congratulation message
+          const congratulation = generateCongratulationMessage(correctAnswers, quizQuestions.length, result.xpAwarded);
+
+          setCongratulationData({
+            correctCount: correctAnswers,
+            totalQuestions: quizQuestions.length,
+            xpEarned: result.xpAwarded,
+            message: congratulation.message
+          });
+          setShowCongratulation(true);
         }
       }
     } catch (err) {
@@ -530,7 +586,7 @@ export default function MeaningQuizPage() {
   }
 
   // Results Screen
-  if (showResults) {
+  if (showResults && !showCongratulation) {
     const score = calculateScore();
     const percentage = Math.round((score / quizQuestions.length) * 100);
 
@@ -785,6 +841,62 @@ export default function MeaningQuizPage() {
           </div>
         </div>
       </div>
+
+      {/* Congratulation Popup */}
+      {showCongratulation && congratulationData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
+          <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] shadow-2xl border-4 border-primary text-center max-w-sm animate-bounce-in">
+            <div className="text-6xl mb-4">
+              {(() => {
+                const percentage = (congratulationData.correctCount / congratulationData.totalQuestions) * 100;
+                if (percentage === 100) return '🎊';
+                if (percentage >= 80) return '🏆';
+                if (percentage >= 60) return '👍';
+                return '💪';
+              })()}
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 dark:text-white mb-2">
+              {(() => {
+                const percentage = (congratulationData.correctCount / congratulationData.totalQuestions) * 100;
+                if (percentage === 100) return 'Tuyệt vời!';
+                if (percentage >= 80) return 'Xuất sắc!';
+                if (percentage >= 60) return 'Tốt lắm!';
+                return 'Cố gắng thêm!';
+              })()}
+            </h2>
+
+            <div className="bg-primary/10 py-4 rounded-2xl mb-6">
+              <p className="text-sm font-bold text-primary uppercase tracking-widest">Bạn nhận được</p>
+              <p className="text-5xl font-black text-primary">+{congratulationData.xpEarned} XP</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {congratulationData.correctCount}/{congratulationData.totalQuestions} câu đúng
+              </p>
+            </div>
+
+            <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
+              Điểm đã được cộng vào hồ sơ cá nhân và cập nhật trên Bảng xếp hạng!
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCongratulation(false);
+                  setShowResults(true);
+                }}
+                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl font-bold hover:scale-105 transition-transform"
+              >
+                Xem kết quả
+              </button>
+              <button
+                onClick={() => window.location.href = '/leaderboard'}
+                className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-transform"
+              >
+                Bảng xếp hạng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthGuard>
   );
 }

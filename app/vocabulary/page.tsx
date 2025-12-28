@@ -5,26 +5,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase'; // Đảm bảo bạn đã có file này
 import AuthGuard from '@/components/AuthGuard';
+import Navbar from '@/components/Navbar';
 
 // --- Local Components ---
-
-const VocabNavbar = () => (
-  <header className="flex items-center justify-between border-b border-gray-200/80 dark:border-gray-700/80 px-4 sm:px-10 py-3">
-    <div className="flex items-center gap-4 text-gray-900 dark:text-gray-100">
-      <div className="size-6 text-primary">
-        <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <path d="M47.2426 24L24 47.2426L0.757355 24L24 0.757355L47.2426 24ZM12.2426 21H35.7574L24 9.24264L12.2426 21Z" fill="currentColor"></path>
-        </svg>
-      </div>
-      <h2 className="text-lg font-bold">VocabLearn</h2>
-    </div>
-    <nav className="hidden md:flex gap-8 items-center">
-      <Link href="/" className="text-sm font-medium text-gray-800 dark:text-gray-200">Home</Link>
-      <Link href="/my-vocabulary" className="text-sm font-medium text-gray-800 dark:text-gray-200">My Vocabulary</Link>
-      <Link href="/auth" className="bg-primary text-white px-4 py-2 rounded-full text-sm font-bold">Tài khoản</Link>
-    </nav>
-  </header>
-);
 
 // Thêm props onSave để xử lý lưu vào database
 const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) => {
@@ -70,6 +53,7 @@ export default function VocabularyPage() {
   const [result, setResult] = useState<any>(null);
   const [translation, setTranslation] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string>("");
 
   // 1. Logic tra cứu từ đơn
   const handleWordSearch = async (e: React.KeyboardEvent) => {
@@ -90,7 +74,8 @@ export default function VocabularyPage() {
           });
           setTranslation("");
         } else {
-          alert("Không tìm thấy từ này!");
+          setMessage("Không tìm thấy từ này!");
+          setTimeout(() => setMessage(''), 3000);
         }
       } catch (err) {
         console.error(err);
@@ -103,7 +88,8 @@ export default function VocabularyPage() {
   // 2. Logic dịch văn bản
   const handleTranslate = async () => {
     if (!translateInput.trim()) {
-      alert("Vui lòng nhập văn bản để dịch!");
+      setMessage("Vui lòng nhập văn bản để dịch!");
+      setTimeout(() => setMessage(''), 3000);
       return;
     }
 
@@ -123,11 +109,13 @@ export default function VocabularyPage() {
         setTranslation(data.translation);
         setResult(null);
       } else {
-        alert("Lỗi khi dịch văn bản!");
+        setMessage("Lỗi khi dịch văn bản!");
+        setTimeout(() => setMessage(''), 3000);
       }
     } catch (err) {
       console.error("Translation error:", err);
-      alert("Lỗi kết nối dịch vụ dịch!");
+      setMessage("Lỗi kết nối dịch vụ dịch!");
+      setTimeout(() => setMessage(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -138,7 +126,8 @@ export default function VocabularyPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Vui lòng đăng nhập để lưu từ vựng!");
+      setMessage("Vui lòng đăng nhập để lưu từ vựng!");
+      setTimeout(() => setMessage(''), 3000);
       return;
     }
 
@@ -154,9 +143,11 @@ export default function VocabularyPage() {
       ]);
 
     if (error) {
-      alert("Lỗi: " + error.message);
+      setMessage("Lỗi: " + error.message);
+      setTimeout(() => setMessage(''), 3000);
     } else {
-      alert("Đã lưu thành công!");
+      setMessage("Đã lưu thành công!");
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -165,7 +156,8 @@ export default function VocabularyPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Vui lòng đăng nhập để lưu từ vựng!");
+      setMessage("Vui lòng đăng nhập để lưu từ vựng!");
+      setTimeout(() => setMessage(''), 3000);
       return;
     }
 
@@ -181,17 +173,24 @@ export default function VocabularyPage() {
       ]);
 
     if (error) {
-      alert("Lỗi: " + error.message);
+      setMessage("Lỗi: " + error.message);
+      setTimeout(() => setMessage(''), 3000);
     } else {
-      alert("Đã lưu thành công!");
+      setMessage("Đã lưu thành công!");
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background-light dark:bg-background-dark">
+        <Navbar />
         <div className="max-w-6xl mx-auto px-4 py-5">
-          <VocabNavbar />
+          {message && (
+            <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+              {message}
+            </div>
+          )}
           <main className="py-10 flex flex-col gap-8">
             <h1 className="text-4xl md:text-5xl font-black text-center dark:text-white">Tra cứu & Học từ vựng</h1>
 

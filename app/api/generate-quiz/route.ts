@@ -167,6 +167,7 @@ Vocabulary words: ${vocabularyList.join(', ')}
 Requirements:
 - Create ${questionCount} multiple choice questions
 - Difficulty: ${difficulty}
+- Distribute questions across different vocabulary words from the list (use different words for different questions)
 - Each question tests ONE vocabulary word from the list
 - Show the word and ask for its meaning in Vietnamese
 - Provide 4 options: 1 correct meaning, 3 plausible distractors
@@ -226,7 +227,7 @@ Return ONLY valid JSON in this exact format:
 
 IMPORTANT: Return ONLY the JSON, no markdown, no extra text.`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();

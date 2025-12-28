@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+import Navbar from '@/components/Navbar';
 
 export default function Profile() {
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -143,7 +144,9 @@ export default function Profile() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen p-8 bg-slate-50 dark:bg-slate-950 font-display">
+      <div className="min-h-screen bg-background-light dark:bg-background-dark">
+        <Navbar />
+        <div className="p-8 bg-slate-50 dark:bg-slate-950 font-display">
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Card thông tin chính */}
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-xl border border-slate-100 dark:border-slate-800 text-center">
@@ -300,6 +303,7 @@ export default function Profile() {
               )}
             </div>
           </div>
+        </div>
         </div>
       </div>
     </AuthGuard>

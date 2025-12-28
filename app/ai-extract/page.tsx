@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+import Navbar from '@/components/Navbar';
 import { hasAIAccess } from '@/lib/checkPro';
 
 export default function AIExtractPage() {
@@ -12,6 +13,7 @@ export default function AIExtractPage() {
   const [activeTab, setActiveTab] = useState('Easy');
   const [user, setUser] = useState<any>(null);
   const [isProUser, setIsProUser] = useState<boolean>(false);
+  const [message, setMessage] = useState<string>('');
 
   // Get user info and check Pro status
   useEffect(() => {
@@ -43,18 +45,18 @@ export default function AIExtractPage() {
       const data = await res.json();
       setVocabGroups(data);
     } catch (err) {
-      alert("Lỗi khi xử lý file");
+      setMessage("Lỗi khi xử lý file");
+      setTimeout(() => setMessage(''), 3000);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveWord = async (word: any) => {
+  const saveWordWithoutAlert = async (word: any) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert("Vui lòng đăng nhập để lưu từ");
-        return;
+        throw new Error("Vui lòng đăng nhập để lưu từ");
       }
       const res = await fetch('/api/my-vocabulary', {
         method: 'POST',
@@ -64,14 +66,23 @@ export default function AIExtractPage() {
         },
         body: JSON.stringify(word),
       });
-      if (res.ok) {
-        alert(`Đã lưu từ: ${word.word}`);
-      } else {
+      if (!res.ok) {
         const errorData = await res.json();
-        alert("Lỗi khi lưu từ: " + errorData.error);
+        throw new Error("Lỗi khi lưu từ: " + errorData.error);
       }
     } catch (err) {
-      alert("Lỗi khi lưu từ");
+      throw new Error("Lỗi khi lưu từ");
+    }
+  };
+
+  const handleSaveWord = async (word: any) => {
+    try {
+      await saveWordWithoutAlert(word);
+      setMessage(`Đã lưu từ: ${word.word}`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Lỗi khi lưu từ");
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -83,14 +94,15 @@ export default function AIExtractPage() {
 
     for (const word of words) {
       try {
-        await handleSaveWord(word);
+        await saveWordWithoutAlert(word);
         successCount++;
       } catch (err) {
         // Continue with next word
       }
     }
 
-    alert(`Đã lưu ${successCount}/${words.length} từ`);
+    setMessage(`Đã lưu ${successCount}/${words.length} từ`);
+    setTimeout(() => setMessage(''), 3000);
   };
 
   if (!isProUser) {
@@ -115,31 +127,16 @@ export default function AIExtractPage() {
   return (
     <AuthGuard>
       <div className="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+        <Navbar />
         <div className="layout-container flex h-full grow flex-col">
           <div className="px-4 sm:px-8 md:px-20 lg:px-40 flex flex-1 justify-center py-5">
             <div className="layout-content-container flex flex-col w-full max-w-[960px] flex-1">
-              <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e7f0f3] dark:border-gray-700/50 px-4 sm:px-6 lg:px-10 py-3">
-                <div className="flex items-center gap-4 text-[#0d181b] dark:text-white">
-                  <div className="size-6 text-primary">
-                    <svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path>
-                    </svg>
-                  </div>
-                  <h2 className="text-[#0d181b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">VocabMaster</h2>
-                </div>
-                <div className="hidden md:flex flex-1 justify-end items-center gap-8">
-                  <div className="flex items-center gap-9">
-                    <Link href="/" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Home</Link>
-                    <Link href="/vocabulary" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Tra từ</Link>
-                    <Link href="/ai-extract" className="text-primary dark:text-primary text-sm font-bold leading-normal">AI Extract</Link>
-                    <Link href="/practice" className="text-[#0d181b] dark:text-gray-300 hover:text-primary dark:hover:text-primary text-sm font-medium leading-normal">Luyện tập</Link>
-                  </div>
-                </div>
-                <button className="md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <span className="material-symbols-outlined text-[#0d181b] dark:text-white">menu</span>
-                </button>
-              </header>
               <main className="flex flex-col gap-10 py-10">
+                {message && (
+                  <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+                    {message}
+                  </div>
+                )}
                 <div className="flex flex-wrap justify-between gap-3 p-4">
                   <div className="flex w-full flex-col gap-3 text-center items-center">
                     <p className="text-[#0d181b] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">AI Vocabulary Extractor</p>
@@ -150,7 +147,7 @@ export default function AIExtractPage() {
                   <div className="flex flex-col items-center gap-6 rounded-lg border-2 border-dashed border-[#cfe1e7] dark:border-gray-700 px-6 py-14 bg-white/50 dark:bg-background-dark/50">
                     <div className="flex max-w-[480px] flex-col items-center gap-2">
                       <p className="text-[#0d181b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] max-w-[480px] text-center">Drag and drop your file here, or click to select a file</p>
-                      <p className="text-[#4c869a] dark:text-gray-400 text-sm font-normal leading-normal max-w-[480px] text-center">Supported formats: .pdf, .doc, .docx</p>
+                      <p className="text-[#4c869a] dark:text-gray-400 text-sm font-normal leading-normal max-w-[480px] text-center">Supported formats: .txt, .docx</p>
                     </div>
                     <input
                       type="file"
