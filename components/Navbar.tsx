@@ -193,8 +193,10 @@ export default function Navbar() {
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200/80 dark:border-gray-700/50 px-6 sm:px-10 py-4">
       <div className="flex items-center gap-4 text-slate-900 dark:text-white">
         <Link href="/" className="font-black text-xl text-primary flex items-center gap-2">
-          <span className="material-symbols-outlined">menu_book</span>
-          <span className="hidden md:block">voca.ai</span>
+          <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
+            <span className="material-symbols-outlined text-[20px]">school</span>
+          </div>
+          <span className="hidden md:block">VocaAI</span>
         </Link>
       </div>
 

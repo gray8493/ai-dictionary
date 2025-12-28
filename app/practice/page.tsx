@@ -262,10 +262,10 @@ export default function PracticeMainPage() {
         {/* Header / Navbar */}
         <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-4">
-            <div className="size-6 text-primary">
-              <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
+            <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
+              <span className="material-symbols-outlined text-[20px]">school</span>
             </div>
-            <h2 className="text-xl font-bold dark:text-white">voca.ai</h2>
+            <h2 className="text-xl font-bold dark:text-white">VocaAI</h2>
           </div>
           <nav className="hidden md:flex gap-8">
             <NavItem href="/" label="Home" />

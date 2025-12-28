@@ -87,20 +87,34 @@ export default function AIExtractPage() {
   };
 
   const handleSaveAll = async () => {
-    if (!vocabGroups || !vocabGroups[activeTab]) return;
+    console.log('handleSaveAll called');
+    console.log('vocabGroups:', vocabGroups);
+    console.log('activeTab:', activeTab);
+
+    if (!vocabGroups || !vocabGroups[activeTab]) {
+      alert('Không có từ nào để lưu');
+      setMessage('Không có từ nào để lưu');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
 
     const words = vocabGroups[activeTab];
+    console.log('Words to save:', words.length);
+
     let successCount = 0;
 
     for (const word of words) {
       try {
+        console.log('Saving word:', word);
         await saveWordWithoutAlert(word);
         successCount++;
       } catch (err) {
+        console.error('Failed to save word:', word, err);
         // Continue with next word
       }
     }
 
+    alert(`Đã lưu ${successCount}/${words.length} từ`);
     setMessage(`Đã lưu ${successCount}/${words.length} từ`);
     setTimeout(() => setMessage(''), 3000);
   };
