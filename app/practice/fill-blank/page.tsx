@@ -115,7 +115,6 @@ export default function FillInBlankPage() {
         fetchUserProfile();
         const hasAccess = await hasAIAccess(user);
         setIsProUser(hasAccess);
-        setIsProUser(hasAccess);
       }
     };
     checkAuth();
@@ -577,9 +576,6 @@ export default function FillInBlankPage() {
                   </div>
 
                   {/* Quiz Setup Screen */}
-                  <div className="bg-white dark:bg-[#1A2C32] rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-800/50">
-                    <h2 className="text-xl font-bold mb-6">Cài đặt bài tập</h2>
-
                   <div className="bg-white dark:bg-[#1A2C32] rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-800/50">
                     <h2 className="text-xl font-bold mb-6">Cài đặt bài tập</h2>
 

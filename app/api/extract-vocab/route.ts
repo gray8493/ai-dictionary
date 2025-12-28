@@ -1,11 +1,33 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from '@supabase/supabase-js';
 import { hasAIAccess, consumeAICredit } from "@/lib/checkPro";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { content } = await req.json(); // Nhận text từ client
 
     if (!content) {
@@ -13,7 +35,7 @@ export async function POST(req: Request) {
     }
 
     // Check Pro access or AI credits
-    const hasAccess = await hasAIAccess();
+    const hasAccess = await hasAIAccess(user);
     if (!hasAccess) {
       return NextResponse.json({
         error: 'Yêu cầu gói Pro để sử dụng tính năng AI trích xuất từ vựng. Hoặc dùng thử còn 3 lần miễn phí.'
@@ -21,9 +43,9 @@ export async function POST(req: Request) {
     }
 
     // Consume credit if not Pro
-    const consumed = await consumeAICredit();
+    const consumed = await consumeAICredit(user);
     if (!consumed) {
-      const recheckAccess = await hasAIAccess();
+      const recheckAccess = await hasAIAccess(user);
       if (!recheckAccess) {
         return NextResponse.json({
           error: 'Không thể sử dụng tính năng AI. Vui lòng nâng cấp gói Pro.'
