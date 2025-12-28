@@ -36,7 +36,18 @@ export default function AuthPage() {
       if (error) {
         alert("Lỗi đăng nhập: " + error.message);
       } else {
-        router.push('/'); // Thành công chuyển về trang chủ
+        // Check role and redirect
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+          router.push(profile?.role === 'admin' ? '/admin' : '/');
+        } else {
+          router.push('/');
+        }
       }
     } else {
       // Logic Đăng ký

@@ -11,7 +11,10 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.89.0",
+    "@tanstack/react-table": "^8.21.3",
     "dotenv": "^17.2.3",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^0.562.0",
     "mammoth": "^1.11.0",
     "next": "16.1.1",
     "pdf-parse": "^2.4.5",
