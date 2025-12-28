@@ -121,12 +121,23 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
       }
 
+      const oldWeeklyXP = profile?.weekly_xp || 0;
+      const newWeeklyXP = oldWeeklyXP + xpGained;
+
+      // Check if daily goal reached (200 XP) and award bonus
+      let bonusXP = 0;
+      console.log(`XP calculation: oldWeeklyXP=${oldWeeklyXP}, xpGained=${xpGained}, newWeeklyXP=${newWeeklyXP}`);
+      if (newWeeklyXP >= 200) {
+        bonusXP = 100;
+        console.log('Daily goal reached! Awarding 100 XP bonus');
+      }
+
       // Update XP directly (level will be auto-calculated by trigger)
       const { error } = await supabase
         .from('user_profiles')
         .update({
-          xp: (profile?.xp || 0) + xpGained,
-          weekly_xp: (profile?.weekly_xp || 0) + xpGained,
+          xp: (profile?.xp || 0) + xpGained + bonusXP,
+          weekly_xp: newWeeklyXP,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -136,7 +147,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to award XP' }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, xpAwarded: xpGained });
+      return NextResponse.json({ success: true, xpAwarded: xpGained, bonusXP });
     }
 
     if (action === 'update_display_name' && display_name) {

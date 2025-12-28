@@ -64,6 +64,8 @@ export default function PracticeMainPage() {
   const [hasWordsSelected, setHasWordsSelected] = useState(false);
   const [selectedWordsCount, setSelectedWordsCount] = useState(0);
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
+  const [dailyXP, setDailyXP] = useState(0);
+  const [goalReached, setGoalReached] = useState(false);
 
   // Fetch user profile
   const fetchUserProfile = async () => {
@@ -122,6 +124,14 @@ export default function PracticeMainPage() {
     }
   };
 
+  // Fetch daily XP (using weekly_xp as approximation for now)
+  const fetchDailyXP = async () => {
+    if (userProfile) {
+      setDailyXP(userProfile.weekly_xp || 0);
+      setGoalReached(userProfile.weekly_xp >= 200);
+    }
+  };
+
   // Check auth and fetch user profile
   useEffect(() => {
     const checkAuth = async () => {
@@ -133,6 +143,11 @@ export default function PracticeMainPage() {
     };
     checkAuth();
   }, []);
+
+  // Update daily XP when userProfile changes
+  useEffect(() => {
+    fetchDailyXP();
+  }, [userProfile]);
 
   // Check for selected words on mount
   useEffect(() => {
@@ -348,10 +363,10 @@ export default function PracticeMainPage() {
               <div className="bg-white dark:bg-[#1A2C32] p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50 shadow-sm flex flex-col gap-2">
                 <div className="flex justify-between text-xs font-bold uppercase text-slate-500">
                   <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-orange-500">local_fire_department</span> Daily Goal</span>
-                  <span className="text-slate-700 dark:text-slate-300">5/20 words</span>
+                  <span className="text-slate-700 dark:text-slate-300">{dailyXP}/200 XP {goalReached ? '🎉 +100 XP bonus!' : ''}</span>
                 </div>
                 <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all duration-500" style={{ width: "25%" }}></div>
+                  <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all duration-500" style={{ width: `${Math.min((dailyXP / 200) * 100, 100)}%` }}></div>
                 </div>
               </div>
 

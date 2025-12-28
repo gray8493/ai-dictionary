@@ -240,8 +240,12 @@ IMPORTANT: Return ONLY the JSON, no markdown, no extra text.`;
     let quizData;
     try {
       // Remove any markdown formatting if present
-      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       console.log('AI Response:', cleanText); // Debug log
+
+      // Fix common JSON issues: trailing commas in arrays/objects
+      cleanText = cleanText.replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas before } or ]
+
       quizData = JSON.parse(cleanText);
     } catch (parseError) {
       console.error('Failed to parse AI response:', text);
