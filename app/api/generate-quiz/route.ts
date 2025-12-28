@@ -4,9 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import { hasAIAccess, consumeAICredit } from '@/lib/checkPro';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Fallback function to generate quiz when AI API fails
 function generateFallbackQuiz(questionCount: number, difficulty: string, vocabularyList: string[], quizType: string) {
@@ -56,6 +53,13 @@ function generateFallbackQuiz(questionCount: number, difficulty: string, vocabul
 }
 
 export async function POST(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.json({ error: 'Supabase configuration missing' }, { status: 500 });
+  }
+
   const body = await req.json();
   const { questionCount, difficulty, vocabularyList, quizType } = body;
 
