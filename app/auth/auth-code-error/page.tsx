@@ -1,4 +1,12 @@
+"use client";
+
+import { useSearchParams } from 'next/navigation';
+
 export default function AuthCodeErrorPage() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get('error');
+  const description = searchParams.get('description');
+
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
@@ -9,6 +17,18 @@ export default function AuthCodeErrorPage() {
         <p className="text-gray-600 dark:text-gray-400 mb-6">
           Có lỗi xảy ra trong quá trình đăng nhập Google. Vui lòng thử lại.
         </p>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 rounded-lg text-left">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              <strong>Error:</strong> {error}
+            </p>
+            {description && (
+              <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                <strong>Description:</strong> {description}
+              </p>
+            )}
+          </div>
+        )}
         <div className="space-y-3">
           <a
             href="/auth"

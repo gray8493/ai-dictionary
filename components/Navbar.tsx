@@ -140,6 +140,11 @@ export default function Navbar() {
 
     getUser();
 
+    // Timeout to ensure loading doesn't get stuck
+    const timeoutId = setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 3000);
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -155,12 +160,15 @@ export default function Navbar() {
         } else {
           setIsPro(false);
         }
+
+        if (mounted) setLoading(false);
       }
     );
 
     return () => {
       mounted = false;
       authListener.subscription.unsubscribe();
+      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -183,6 +191,8 @@ export default function Navbar() {
   };
 
   const progress = userProfile ? (userProfile.xp / getNextLevelXP(userProfile.level)) * 100 : 0;
+
+
 
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200/80 dark:border-gray-700/50 px-6 sm:px-10 py-4">
@@ -241,12 +251,12 @@ export default function Navbar() {
             </button>
           </div>
         ) : !loading ? (
-          <button
-            onClick={handleGoogleLogin}
+          <Link
+            href="/auth"
             className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90"
           >
             <span className="truncate">Đăng nhập</span>
-          </button>
+          </Link>
         ) : null}
       </div>
     </header>
