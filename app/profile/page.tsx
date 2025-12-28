@@ -14,6 +14,8 @@ export default function Profile() {
   const [editingName, setEditingName] = useState(false);
   const [newDisplayName, setNewDisplayName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   const fetchUserProfile = async () => {
     try {
@@ -69,6 +71,37 @@ export default function Profile() {
       alert('Lỗi khi cập nhật tên');
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const saveAvatar = async (avatarId: number) => {
+    setSavingAvatar(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/user-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_avatar',
+          avatar_id: avatarId
+        }),
+      });
+
+      if (response.ok) {
+        setUserProfile((prev: any) => ({ ...prev, avatar_id: avatarId }));
+        setShowAvatarSelector(false);
+      } else {
+        alert('Không thể cập nhật avatar');
+      }
+    } catch (error) {
+      alert('Lỗi khi cập nhật avatar');
+    } finally {
+      setSavingAvatar(false);
     }
   };
 
@@ -150,8 +183,18 @@ export default function Profile() {
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Card thông tin chính */}
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-xl border border-slate-100 dark:border-slate-800 text-center">
-            <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center">
-               <span className="material-symbols-outlined text-6xl text-primary">{getRankIcon(userProfile.level)}</span>
+            <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center relative group">
+               <img
+                 src={`/avatar/avatar${userProfile.avatar_id || 1}.png`}
+                 alt="Avatar"
+                 className="size-24 rounded-full object-cover border-4 border-white dark:border-slate-800"
+               />
+               <button
+                 onClick={() => setShowAvatarSelector(true)}
+                 className="absolute -bottom-2 -right-2 bg-primary text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+               >
+                 <span className="material-symbols-outlined text-lg">edit</span>
+               </button>
             </div>
 
             <div className="mb-2">
@@ -305,6 +348,60 @@ export default function Profile() {
           </div>
         </div>
         </div>
+
+        {/* Avatar Selector Modal */}
+        {showAvatarSelector && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 max-w-md w-full max-h-[90vh] overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">Chọn Avatar</h2>
+                  <button
+                    onClick={() => setShowAvatarSelector(false)}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((avatarId) => (
+                    <button
+                      key={avatarId}
+                      onClick={() => saveAvatar(avatarId)}
+                      disabled={savingAvatar}
+                      className={`aspect-square rounded-xl border-2 transition-all ${
+                        userProfile.avatar_id === avatarId
+                          ? 'border-primary bg-primary/10'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                      } ${savingAvatar ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <img
+                        src={`/avatar/avatar${avatarId}.png`}
+                        alt={`Avatar ${avatarId}`}
+                        className="w-full h-full rounded-lg object-cover"
+                      />
+                      {userProfile.avatar_id === avatarId && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="bg-primary text-white rounded-full p-1">
+                            <span className="material-symbols-outlined text-sm">check</span>
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {savingAvatar && (
+                  <div className="flex items-center justify-center mt-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <span className="ml-2 text-sm text-slate-500">Đang lưu...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AuthGuard>
   );
