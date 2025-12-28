@@ -528,7 +528,7 @@ export default function FillInBlankPage() {
               <div className="size-6 text-primary">
                 <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
               </div>
-              <h2 className="text-xl font-bold dark:text-white">VocabLearn</h2>
+              <h2 className="text-xl font-bold dark:text-white">voca.ai</h2>
             </div>
             <nav className="hidden md:flex gap-8">
               <NavItem href="/" label="Home" />
@@ -575,6 +575,10 @@ export default function FillInBlankPage() {
                     <span className="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-xs font-bold uppercase">Fill in the Blank</span>
                     <h1 className="text-3xl font-black">Điền từ vào chỗ trống</h1>
                   </div>
+
+                  {/* Quiz Setup Screen */}
+                  <div className="bg-white dark:bg-[#1A2C32] rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-800/50">
+                    <h2 className="text-xl font-bold mb-6">Cài đặt bài tập</h2>
 
                   <div className="bg-white dark:bg-[#1A2C32] rounded-3xl p-8 shadow-sm border border-slate-100 dark:border-slate-800/50">
                     <h2 className="text-xl font-bold mb-6">Cài đặt bài tập</h2>
@@ -641,7 +645,7 @@ export default function FillInBlankPage() {
               <div className="size-6 text-primary">
                 <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
               </div>
-              <h2 className="text-xl font-bold dark:text-white">VocabLearn</h2>
+              <h2 className="text-xl font-bold dark:text-white">voca.ai</h2>
             </div>
             <nav className="hidden md:flex gap-8">
               <NavItem href="/" label="Home" />
@@ -736,7 +740,7 @@ export default function FillInBlankPage() {
             <div className="size-6 text-primary">
               <svg fill="currentColor" viewBox="0 0 48 48"><path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z"></path></svg>
             </div>
-            <h2 className="text-xl font-bold dark:text-white">VocabLearn</h2>
+            <h2 className="text-xl font-bold dark:text-white">voca.ai</h2>
           </div>
           <nav className="hidden md:flex gap-8">
             <NavItem href="/" label="Home" />

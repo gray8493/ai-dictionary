@@ -194,7 +194,7 @@ export default function Navbar() {
       <div className="flex items-center gap-4 text-slate-900 dark:text-white">
         <Link href="/" className="font-black text-xl text-primary flex items-center gap-2">
           <span className="material-symbols-outlined">menu_book</span>
-          <span className="hidden md:block">VOCAB.AI</span>
+          <span className="hidden md:block">voca.ai</span>
         </Link>
       </div>
 
