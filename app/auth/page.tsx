@@ -13,6 +13,10 @@ export default function AuthPage() {
   // --- BACKEND LOGIC STATES ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [gender, setGender] = useState('male');
+  const [role, setRole] = useState('student');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -56,6 +60,12 @@ export default function AuthPage() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            gender: gender,
+            role: role,
+          },
         },
       });
       if (error) {
@@ -135,15 +145,70 @@ export default function AuthPage() {
                 <form className="flex flex-col gap-4" onSubmit={handleAuth}>
                   <div className="flex flex-col gap-2">
                     <label className="text-slate-900 dark:text-white text-base font-medium">Email</label>
-                    <input 
+                    <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white"
                       placeholder="Nhập địa chỉ email của bạn"
+                      autoComplete="email"
                     />
                   </div>
+
+                  {!isLogin && (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-slate-900 dark:text-white text-base font-medium">Tên</label>
+                        <input
+                          type="text"
+                          required
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white"
+                          placeholder="Nhập tên của bạn"
+                          autoComplete="given-name"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-slate-900 dark:text-white text-base font-medium">Họ</label>
+                        <input
+                          type="text"
+                          required
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white"
+                          placeholder="Nhập họ của bạn"
+                          autoComplete="family-name"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-slate-900 dark:text-white text-base font-medium">Giới tính</label>
+                        <select
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white"
+                        >
+                          <option value="male">Nam</option>
+                          <option value="female">Nữ</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-slate-900 dark:text-white text-base font-medium">Vai trò</label>
+                        <select
+                          value={role}
+                          onChange={(e) => setRole(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white"
+                        >
+                          <option value="student">Học sinh</option>
+                          <option value="teacher">Giáo viên</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
 
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-baseline">

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(req: NextRequest) {
   try {
@@ -69,19 +70,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch leaderboard', details: error }, { status: 500 });
     }
 
+    // Get user metadata for full names
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    const userIds = data.map(item => item.user_id);
+    const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+
+    const userMap = new Map();
+    if (users && !usersError) {
+      users.users.forEach(user => {
+        userMap.set(user.id, {
+          first_name: user.user_metadata?.first_name || '',
+          last_name: user.user_metadata?.last_name || ''
+        });
+      });
+    }
+
     // Format the data to hide sensitive information and add ranking
-    const leaderboard = data.map((item: any, index: number) => ({
-      rank: index + 1,
-      user_id: item.user_id,
-      display_name: item.display_name || `User ${item.user_id.substring(0, 8)}`, // Use display_name or fallback to user ID prefix
-      xp: item.xp,
-      level: item.level,
-      weekly_xp: item.weekly_xp,
-      weekly_mastered: item.weekly_mastered,
-      total_mastered: item.mastered_vocabularies,
-      total_vocabularies: item.total_vocabularies,
-      is_pro: item.is_pro || false
-    }));
+    const leaderboard = data.map((item: any, index: number) => {
+      const userMeta = userMap.get(item.user_id) || {};
+      const fullName = `${userMeta.first_name} ${userMeta.last_name}`.trim();
+      const displayName = fullName || item.display_name || `User ${item.user_id.substring(0, 8)}`;
+
+      return {
+        rank: index + 1,
+        user_id: item.user_id,
+        display_name: displayName,
+        xp: item.xp,
+        level: item.level,
+        weekly_xp: item.weekly_xp,
+        weekly_mastered: item.weekly_mastered,
+        total_mastered: item.mastered_vocabularies,
+        total_vocabularies: item.total_vocabularies,
+        is_pro: item.is_pro || false
+      };
+    });
 
     return NextResponse.json({
       success: true,

@@ -267,13 +267,6 @@ export default function Navbar() {
               </button>
             </div>
           </div>
-        ) : !loading ? (
-          <Link
-            href="/auth"
-            className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:opacity-90"
-          >
-            <span className="truncate">Đăng nhập</span>
-          </Link>
         ) : null}
       </div>
 

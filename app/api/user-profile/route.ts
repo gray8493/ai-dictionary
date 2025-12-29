@@ -52,28 +52,89 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
     }
 
-    // Return profile or create default if not exists
-    const userProfile = profile || {
-      id: null,
-      user_id: user.id,
-      xp: 0,
-      level: 1,
-      total_vocabularies: 0,
-      mastered_vocabularies: 0,
-      weekly_xp: 0,
-      weekly_mastered: 0,
-      is_pro: false,
-      ai_credits: 3,
-      display_name: user.email?.split('@')[0] || 'User',
-      avatar_id: 1, // Default avatar
-      subscription_expires_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    if (!profile) {
+      // Create new profile
+      const display_name = `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || user.email?.split('@')[0] || 'User';
+
+      const { error: insertError } = await supabase
+        .from('user_profiles')
+        .insert({
+          user_id: user.id,
+          xp: 0,
+          level: 1,
+          total_vocabularies: 0,
+          mastered_vocabularies: 0,
+          weekly_xp: 0,
+          weekly_mastered: 0,
+          is_pro: false,
+          ai_credits: 3,
+          display_name,
+          subscription_expires_at: null,
+        });
+
+      if (insertError) {
+        console.error('Profile insert error:', insertError);
+        return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
+      }
+
+      // Fetch the newly created profile
+      const { data: newProfile, error: fetchError } = await supabase
+        .from('user_profiles')
+        .select(`
+          id,
+          user_id,
+          xp,
+          level,
+          total_vocabularies,
+          mastered_vocabularies,
+          weekly_xp,
+          weekly_mastered,
+          created_at,
+          updated_at,
+          is_pro,
+          ai_credits,
+          display_name,
+          subscription_expires_at
+        `)
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.error('New profile fetch error:', fetchError);
+        return NextResponse.json({ error: 'Failed to fetch new profile' }, { status: 500 });
+      }
+
+      // Include user metadata
+      const profileWithMetadata = {
+        ...newProfile,
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+        gender: user.user_metadata?.gender || 'male',
+        role: user.user_metadata?.role || 'student',
+        email: user.email,
+        avatar_id: 1
+      };
+
+      return NextResponse.json({
+        success: true,
+        data: profileWithMetadata
+      });
+    }
+
+    // Include user metadata
+    const profileWithMetadata = {
+      ...profile,
+      first_name: user.user_metadata?.first_name || '',
+      last_name: user.user_metadata?.last_name || '',
+      gender: user.user_metadata?.gender || 'male',
+      role: user.user_metadata?.role || 'student',
+      email: user.email,
+      avatar_id: 1
     };
 
     return NextResponse.json({
       success: true,
-      data: userProfile
+      data: profileWithMetadata
     });
   } catch (error) {
     console.error('API error:', error);
@@ -103,7 +164,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action, xp, difficulty, display_name, avatar_id } = body;
+    const { action, xp, difficulty, display_name, avatar_id, first_name, last_name, gender, role } = body;
 
     if (action === 'practice_correct') {
       // Award XP logic
@@ -194,6 +255,33 @@ export async function POST(req: NextRequest) {
         // Return success for now if migration not run
         return NextResponse.json({ success: true, avatar_id });
       }
+    }
+
+    if (action === 'update_profile' && (first_name !== undefined || last_name !== undefined || gender !== undefined || role !== undefined)) {
+      // Update user metadata using service role
+      const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const updates: any = {};
+      if (first_name !== undefined) updates.first_name = first_name;
+      if (last_name !== undefined) updates.last_name = last_name;
+      if (gender !== undefined) updates.gender = gender;
+      if (role !== undefined) updates.role = role;
+
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        user_metadata: updates
+      });
+
+      if (error) {
+        console.error('Profile update error:', error);
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, updated: true });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

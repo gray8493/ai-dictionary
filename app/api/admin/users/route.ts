@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,7 +52,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: usersError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ users });
+    // Get user metadata for full names
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    const userIds = users.map(user => user.user_id);
+    const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
+
+    const userMap = new Map();
+    if (authUsers && !authUsersError) {
+      authUsers.users.forEach(authUser => {
+        userMap.set(authUser.id, {
+          first_name: authUser.user_metadata?.first_name || '',
+          last_name: authUser.user_metadata?.last_name || '',
+          email: authUser.email
+        });
+      });
+    }
+
+    // Combine profile data with auth metadata
+    const usersWithMetadata = users.map(user => {
+      const metadata = userMap.get(user.user_id) || {};
+      const fullName = `${metadata.first_name || ''} ${metadata.last_name || ''}`.trim();
+      return {
+        ...user,
+        full_name: fullName || null,
+        email: metadata.email
+      };
+    });
+
+    return NextResponse.json({ users: usersWithMetadata });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

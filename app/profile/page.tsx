@@ -16,6 +16,14 @@ export default function Profile() {
   const [savingName, setSavingName] = useState(false);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileData, setProfileData] = useState({
+    first_name: '',
+    last_name: '',
+    gender: 'male',
+    role: 'student'
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const fetchUserProfile = async () => {
     try {
@@ -33,6 +41,12 @@ export default function Profile() {
 
       if (response.ok && result.success) {
         setUserProfile(result.data);
+        setProfileData({
+          first_name: result.data.first_name || '',
+          last_name: result.data.last_name || '',
+          gender: result.data.gender || 'male',
+          role: result.data.role || 'student'
+        });
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -102,6 +116,46 @@ export default function Profile() {
       alert('Lỗi khi cập nhật avatar');
     } finally {
       setSavingAvatar(false);
+    }
+  };
+
+  const saveProfileData = async () => {
+    setSavingProfile(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/user-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_profile',
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          gender: profileData.gender,
+          role: profileData.role
+        }),
+      });
+
+      if (response.ok) {
+        setUserProfile((prev: any) => ({
+          ...prev,
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          gender: profileData.gender,
+          role: profileData.role
+        }));
+        setEditingProfile(false);
+      } else {
+        alert('Không thể cập nhật thông tin cá nhân');
+      }
+    } catch (error) {
+      alert('Lỗi khi cập nhật thông tin cá nhân');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -198,44 +252,14 @@ export default function Profile() {
             </div>
 
             <div className="mb-2">
-              {editingName ? (
-                <div className="flex items-center gap-2 justify-center">
-                  <input
-                    type="text"
-                    value={newDisplayName}
-                    onChange={(e) => setNewDisplayName(e.target.value)}
-                    className="text-3xl font-black text-center bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1 border-2 border-primary/50 focus:outline-none"
-                    placeholder="Nhập tên hiển thị"
-                    maxLength={20}
-                  />
-                  <button
-                    onClick={saveDisplayName}
-                    disabled={savingName}
-                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
-                  >
-                    {savingName ? '...' : '✓'}
-                  </button>
-                  <button
-                    onClick={() => setEditingName(false)}
-                    className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  <h1 className="text-3xl font-black">{userProfile.display_name || user.email?.split('@')[0] || 'User'}</h1>
-                  <button
-                    onClick={() => {
-                      setEditingName(true);
-                      setNewDisplayName(userProfile.display_name || user.email?.split('@')[0] || 'User');
-                    }}
-                    className="p-1 text-slate-400 hover:text-primary transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-lg">edit</span>
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center justify-center">
+                <h1 className="text-3xl font-black">
+                  {userProfile.first_name && userProfile.last_name
+                    ? `${userProfile.first_name} ${userProfile.last_name}`
+                    : userProfile.display_name || user.email?.split('@')[0] || 'User'
+                  }
+                </h1>
+              </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 mb-2">
@@ -279,6 +303,134 @@ export default function Profile() {
             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
               <p className="text-slate-400 text-xs font-bold uppercase">Từ thuộc tuần</p>
               <p className="text-3xl font-black text-purple-500">{userProfile.weekly_mastered || 0}</p>
+            </div>
+          </div>
+
+          {/* Personal Information */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">Thông tin cá nhân</h3>
+              <button
+                onClick={() => {
+                  if (editingProfile) {
+                    saveProfileData();
+                  } else {
+                    setEditingProfile(true);
+                  }
+                }}
+                disabled={savingProfile}
+                className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {savingProfile ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <span className="material-symbols-outlined text-sm">
+                    {editingProfile ? 'save' : 'edit'}
+                  </span>
+                )}
+                {editingProfile ? 'Lưu' : 'Chỉnh sửa'}
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Tên</label>
+                  {editingProfile ? (
+                    <input
+                      type="text"
+                      value={profileData.first_name}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                      placeholder="Nhập tên"
+                    />
+                  ) : (
+                    <p className="text-slate-900 dark:text-white font-medium">{userProfile.first_name || 'Chưa cập nhật'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Họ</label>
+                  {editingProfile ? (
+                    <input
+                      type="text"
+                      value={profileData.last_name}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                      placeholder="Nhập họ"
+                    />
+                  ) : (
+                    <p className="text-slate-900 dark:text-white font-medium">{userProfile.last_name || 'Chưa cập nhật'}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Giới tính</label>
+                  {editingProfile ? (
+                    <select
+                      value={profileData.gender}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, gender: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                    >
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                    </select>
+                  ) : (
+                    <p className="text-slate-900 dark:text-white font-medium">
+                      {userProfile.gender === 'male' ? 'Nam' : userProfile.gender === 'female' ? 'Nữ' : 'Chưa cập nhật'}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Vai trò</label>
+                  {editingProfile ? (
+                    <select
+                      value={profileData.role}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, role: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                    >
+                      <option value="student">Học sinh</option>
+                      <option value="teacher">Giáo viên</option>
+                    </select>
+                  ) : (
+                    <p className="text-slate-900 dark:text-white font-medium">
+                      {userProfile.role === 'student' ? 'Học sinh' : userProfile.role === 'teacher' ? 'Giáo viên' : 'Chưa cập nhật'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Email</label>
+                <p className="text-slate-900 dark:text-white font-medium">{userProfile.email}</p>
+              </div>
+
+              {editingProfile && (
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveProfileData}
+                    disabled={savingProfile}
+                    className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 font-medium"
+                  >
+                    {savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingProfile(false);
+                      setProfileData({
+                        first_name: userProfile.first_name || '',
+                        last_name: userProfile.last_name || '',
+                        gender: userProfile.gender || 'male',
+                        role: userProfile.role || 'student'
+                      });
+                    }}
+                    className="px-4 py-2 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-400 dark:hover:bg-slate-600 font-medium"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

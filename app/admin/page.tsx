@@ -18,6 +18,7 @@ import { ChevronUp, ChevronDown, Eye, Crown, Lock, Unlock, Copy } from 'lucide-r
 interface User {
   user_id: string;
   full_name: string | null;
+  email: string | null;
   avatar_id: number | null;
   is_pro: boolean;
   xp: number;
@@ -44,6 +45,7 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
   const [planFilter, setPlanFilter] = useState('All');
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -120,7 +122,12 @@ export default function AdminPage() {
     });
 
     if (response.ok) {
-      fetchUsers();
+      await fetchUsers();
+      setRefreshKey(prev => prev + 1); // Force re-render
+      // Update selectedUser if it's the same user
+      if (selectedUser && selectedUser.user_id === userId) {
+        setSelectedUser(prev => prev ? { ...prev, is_pro: action === 'toggle_pro' ? !prev.is_pro : prev.is_pro, status: action === 'lock' ? 'locked' : action === 'unlock' ? 'active' : prev.status } : null);
+      }
     } else {
       alert('Lỗi khi thực hiện hành động');
     }
@@ -381,7 +388,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3">
                             <div className="size-10 rounded-full bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${row.original.avatar_id ? `/avatar/avatar${row.original.avatar_id}.png` : '/avatar/avatar1.png'})` }}></div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.original.full_name || row.original.user_id}</span>
+                              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.original.full_name || 'Chưa cập nhật'}</span>
                               <span className="text-xs text-slate-500 dark:text-slate-400">ID: {row.original.user_id.slice(0, 8)}...</span>
                             </div>
                           </div>

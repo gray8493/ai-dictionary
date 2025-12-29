@@ -1,15 +1,12 @@
 // src/app/vocabulary/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase'; // Đảm bảo bạn đã có file này
+import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 
-// --- Local Components ---
-
-// Thêm props onSave để xử lý lưu vào database
 const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) => {
   const playAudio = () => {
     if (audioUrl) {
@@ -33,7 +30,7 @@ const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) 
         <p className="font-medium dark:text-gray-200">{meaning}</p>
         <p className="text-sm italic text-gray-500">Example: {example}</p>
         <div className="flex justify-end">
-          <button 
+          <button
             onClick={() => onSave({ word, ipa, meaning, example })}
             className="bg-primary text-white px-5 py-2 rounded-full text-sm flex items-center gap-2 hover:bg-opacity-90 transition-all"
           >
@@ -45,7 +42,6 @@ const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) 
   );
 };
 
-// --- Main Component ---
 export default function VocabularyPage() {
   const [mode, setMode] = useState<'word' | 'translate'>('word');
   const [search, setSearch] = useState("");
@@ -53,9 +49,26 @@ export default function VocabularyPage() {
   const [result, setResult] = useState<any>(null);
   const [translation, setTranslation] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
 
-  // 1. Logic tra cứu từ đơn
+  useEffect(() => {
+    const history = localStorage.getItem('vocabulary_search_history');
+    if (history) {
+      setSearchHistory(JSON.parse(history));
+    } else {
+      // Initialize with some sample words for demo
+      const sampleHistory = ['hello', 'world', 'computer', 'language', 'learning'];
+      setSearchHistory(sampleHistory);
+      saveSearchHistory(sampleHistory);
+    }
+  }, []);
+
+  const saveSearchHistory = (history: string[]) => {
+    localStorage.setItem('vocabulary_search_history', JSON.stringify(history));
+    setSearchHistory(history);
+  };
+
   const handleWordSearch = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && search.trim()) {
       setLoading(true);
@@ -64,10 +77,33 @@ export default function VocabularyPage() {
         const data = await res.json();
         if (res.ok) {
           const entry = data[0];
+          const englishMeaning = entry.meanings[0].definitions[0].definition;
+
+          // Translate meaning to Vietnamese
+          let vietnameseMeaning = englishMeaning;
+          try {
+            const translateResponse = await fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: englishMeaning }),
+            });
+            if (translateResponse.ok) {
+              const translateData = await translateResponse.json();
+              vietnameseMeaning = translateData.translation;
+            }
+          } catch (translateErr) {
+            console.log('Translation failed, using English meaning');
+          }
+
+          // Add to search history
+          const updatedHistory = [search.trim(), ...searchHistory.filter(w => w !== search.trim())].slice(0, 20);
+          saveSearchHistory(updatedHistory);
+
           setResult({
             word: entry.word,
             ipa: entry.phonetic || entry.phonetics.find((p: any) => p.text)?.text || "",
-            meaning: entry.meanings[0].definitions[0].definition,
+            meaning: vietnameseMeaning,
+            englishMeaning: englishMeaning, // Keep original for reference
             example: entry.meanings[0].definitions[0].example || "No example available.",
             audioUrl: entry.phonetics.find((p: any) => p.audio !== "")?.audio || "",
             img: `https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500`
@@ -85,7 +121,6 @@ export default function VocabularyPage() {
     }
   };
 
-  // 2. Logic dịch văn bản
   const handleTranslate = async () => {
     if (!translateInput.trim()) {
       setMessage("Vui lòng nhập văn bản để dịch!");
@@ -95,7 +130,6 @@ export default function VocabularyPage() {
 
     setLoading(true);
     try {
-      // Use our API route for translation
       const response = await fetch('/api/translate', {
         method: 'POST',
         headers: {
@@ -121,37 +155,6 @@ export default function VocabularyPage() {
     }
   };
 
-  // 3. Logic lưu từ vựng
-  const handleSaveToDb = async (vocabData: any) => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setMessage("Vui lòng đăng nhập để lưu từ vựng!");
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
-    const { error } = await supabase
-      .from('vocabularies')
-      .insert([
-        {
-          user_id: user.id,
-          word: vocabData.word,
-          ipa: vocabData.ipa || '',
-          meaning: vocabData.meaning || vocabData.definition,
-        }
-      ]);
-
-    if (error) {
-      setMessage("Lỗi: " + error.message);
-      setTimeout(() => setMessage(''), 3000);
-    } else {
-      setMessage("Đã lưu thành công!");
-      setTimeout(() => setMessage(''), 3000);
-    }
-  };
-
-  // 4. Lưu từ vựng từ kết quả tra cứu
   const handleSaveWord = async (wordData: any) => {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -194,7 +197,6 @@ export default function VocabularyPage() {
           <main className="py-10 flex flex-col gap-8">
             <h1 className="text-4xl md:text-5xl font-black text-center dark:text-white">Tra cứu & Học từ vựng</h1>
 
-            {/* Mode Toggle */}
             <div className="flex justify-center">
               <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                 <button
@@ -220,7 +222,6 @@ export default function VocabularyPage() {
               </div>
             </div>
 
-            {/* Input Section */}
             {mode === 'word' ? (
               <div className="relative">
                 <span className="absolute left-4 top-4 text-gray-400 material-symbols-outlined">search</span>
@@ -262,16 +263,13 @@ export default function VocabularyPage() {
               </div>
             )}
 
-            {/* Results Section */}
             <div className="flex flex-col gap-6 @container">
               {loading && <p className="text-center dark:text-white">Đang xử lý...</p>}
 
-              {/* Word Search Results */}
               {mode === 'word' && result && (
                 <VocabCard {...result} onSave={handleSaveWord} />
               )}
 
-              {/* Translation Results */}
               {mode === 'translate' && translation && (
                 <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg shadow-sm">
                   <div className="flex items-center gap-2 mb-4">
@@ -295,22 +293,30 @@ export default function VocabularyPage() {
                 </div>
               )}
 
-              {/* Default examples when no results */}
-              {mode === 'word' && !result && !loading && (
-                <>
-                  <VocabCard
-                    word="Hello" ipa="/həˈloʊ/" meaning="Xin chào"
-                    example="Hello, how are you today?"
-                    img="https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500"
-                    onSave={handleSaveWord}
-                  />
-                  <VocabCard
-                    word="Thank you" ipa="/ˈθæŋk ju/" meaning="Cảm ơn"
-                    example="Thank you for your help."
-                    img="https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500"
-                    onSave={handleSaveWord}
-                  />
-                </>
+              {/* Search History */}
+              {mode === 'word' && !result && !loading && searchHistory.length > 0 && (
+                <div className="bg-white dark:bg-gray-800/50 p-6 rounded-lg shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary">history</span>
+                    <h2 className="text-xl font-bold dark:text-white">Lịch sử tìm kiếm</h2>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {searchHistory.slice(0, 10).map((word, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSearch(word)}
+                        className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm hover:bg-primary hover:text-white transition-colors"
+                      >
+                        {word}
+                      </button>
+                    ))}
+                  </div>
+                  {searchHistory.length > 10 && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Và {searchHistory.length - 10} từ khác...
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </main>

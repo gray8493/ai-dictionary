@@ -12,7 +12,6 @@ interface LeaderboardEntry {
   xp: number;
   level: number;
   weekly_xp: number;
-  weekly_mastered: number;
   total_mastered: number;
   total_vocabularies: number;
   is_pro: boolean;
@@ -142,15 +141,12 @@ export default function LeaderboardPage() {
                 <th className="p-4 font-bold text-slate-700 dark:text-gray-200 text-center">
                   {activeTab === 'weekly' ? 'XP Tuần' : 'Tổng XP'}
                 </th>
-                <th className="p-4 font-bold text-slate-700 dark:text-gray-200 text-center">
-                  {activeTab === 'weekly' ? 'Từ thuộc tuần' : 'Từ đã thuộc'}
-                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-gray-400">
+                  <td colSpan={4} className="p-8 text-center text-slate-500 dark:text-gray-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                       Đang tải bảng xếp hạng...
@@ -159,13 +155,13 @@ export default function LeaderboardPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-red-500 dark:text-red-400">
+                  <td colSpan={4} className="p-8 text-center text-red-500 dark:text-red-400">
                     {error}
                   </td>
                 </tr>
               ) : leaderboard.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-gray-400">
+                  <td colSpan={4} className="p-8 text-center text-slate-500 dark:text-gray-400">
                     Chưa có dữ liệu xếp hạng
                   </td>
                 </tr>
@@ -210,7 +206,6 @@ export default function LeaderboardPage() {
                     </td>
                     <td className="p-4 text-center">
                       <span className="text-slate-600 dark:text-gray-400">
-                        {activeTab === 'weekly' ? entry.weekly_mastered : entry.total_mastered}
                       </span>
                     </td>
                   </tr>

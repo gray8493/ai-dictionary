@@ -113,11 +113,30 @@ export default function HomePage() {
 
   const handleStartLearning = () => {
     if (user) {
-      // Đã đăng nhập, chuyển đến vocabulary
-      router.push('/vocabulary');
+      // Đã đăng nhập, đăng xuất
+      supabase.auth.signOut();
     } else {
-      // Chưa đăng nhập, chuyển đến auth
+      // Chưa đăng nhập, chuyển đến trang auth
       router.push('/auth');
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        console.error('Login error:', error);
+        alert('Đăng nhập thất bại: ' + error.message);
+      }
+      // Don't set loading false here - page will redirect
+    } catch (err) {
+      console.error('Login failed:', err);
+      alert('Đăng nhập thất bại');
     }
   };
 
@@ -151,7 +170,7 @@ export default function HomePage() {
                   <h1 className="text-slate-900 dark:text-white text-4xl font-black leading-tight sm:text-5xl md:text-6xl">Học Tiếng Anh Thông Minh</h1>
                   <h2 className="text-slate-600 dark:text-gray-300 text-base font-normal sm:text-lg">Khám phá phương pháp học tập hiệu quả với AI.</h2>
                   <button onClick={handleStartLearning} className="self-center lg:self-start flex min-w-[84px] items-center justify-center rounded-full h-12 px-6 bg-primary text-white text-base font-bold hover:opacity-90">
-                    Bắt đầu học
+                    {user ? 'Đăng xuất' : 'Đăng nhập'}
                   </button>
                 </div>
                 <div className="w-full lg:w-1/2">
