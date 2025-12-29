@@ -267,7 +267,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { userId } = await request.json();
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {

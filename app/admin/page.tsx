@@ -170,13 +170,11 @@ export default function AdminPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const response = await fetch('/api/admin/users', {
+    const response = await fetch(`/api/admin/users?userId=${userId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId }),
     });
 
     if (response.ok) {
@@ -747,6 +745,96 @@ export default function AdminPage() {
                   Lưu thay đổi
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddUserModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowAddUserModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <h3 className="text-lg font-bold">Thêm người dùng mới</h3>
+                <button onClick={() => setShowAddUserModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Họ và tên</label>
+                  <input
+                    required
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2"
+                    type="text"
+                    value={newUserForm.full_name}
+                    onChange={e => setNewUserForm({ ...newUserForm, full_name: e.target.value })}
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    required
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2"
+                    type="email"
+                    value={newUserForm.email}
+                    onChange={e => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Mật khẩu</label>
+                  <input
+                    required
+                    minLength={6}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2"
+                    type="password"
+                    value={newUserForm.password}
+                    onChange={e => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vai trò</label>
+                  <select
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm px-4 py-2"
+                    value={newUserForm.role}
+                    onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                  >
+                    <option value="user">Người dùng (User)</option>
+                    <option value="admin">Quản trị viên (Admin)</option>
+                  </select>
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddUserModal(false)}
+                    className="flex-1 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-medium"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingUser}
+                    className="flex-1 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
+                  >
+                    {addingUser ? 'Đang tạo...' : 'Tạo người dùng'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
