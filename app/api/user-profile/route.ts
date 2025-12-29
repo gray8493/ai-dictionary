@@ -209,25 +209,32 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'update_avatar' && avatar_id !== undefined) {
+      console.log(`Updating avatar for user ${user.id} to ${avatar_id}`);
+
+      const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
       // Update avatar
-      const { error } = await supabase
+      const { data, error, count } = await supabaseAdmin
         .from('user_profiles')
         .update({
-          avatar_id: avatar_id,
+          avatar_id: Number(avatar_id),
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select();
 
       if (error) {
         console.error('Avatar update error:', error);
-        // If column doesn't exist yet, return success anyway
-        if (error.message?.includes('avatar_id')) {
-          return NextResponse.json({ success: true, avatar_id });
-        }
-        return NextResponse.json({ error: 'Failed to update avatar' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to update avatar: ' + error.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, avatar_id });
+      console.log('Update result:', { data, count });
+      return NextResponse.json({ success: true, avatar_id, updated: data });
     }
 
     if (action === 'update_profile' && (first_name !== undefined || last_name !== undefined || gender !== undefined || role !== undefined)) {

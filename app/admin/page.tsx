@@ -48,6 +48,15 @@ export default function AdminPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [adminProfile, setAdminProfile] = useState<any>(null);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [addingUser, setAddingUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'user'
+  });
 
   useEffect(() => {
     checkAdminAccess();
@@ -76,6 +85,27 @@ export default function AdminPage() {
     }
 
     fetchUsers();
+    fetchAdminProfile();
+  };
+
+  const fetchAdminProfile = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/user-profile', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setAdminProfile(result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching admin profile:', err);
+    }
   };
 
   const fetchUsers = async () => {
@@ -132,6 +162,63 @@ export default function AdminPage() {
       alert('Lỗi khi thực hiện hành động');
     }
     setContextMenu(null);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác.')) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const response = await fetch('/api/admin/users', {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (response.ok) {
+      await fetchUsers();
+      alert('Xóa người dùng thành công');
+    } else {
+      const errorData = await response.json();
+      alert('Lỗi: ' + (errorData.error || 'Không thể xóa người dùng'));
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddingUser(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUserForm),
+      });
+
+      if (response.ok) {
+        await fetchUsers();
+        setShowAddUserModal(false);
+        setNewUserForm({ email: '', password: '', full_name: '', role: 'user' });
+        alert('Tạo người dùng mới thành công');
+      } else {
+        const errorData = await response.json();
+        alert('Lỗi: ' + (errorData.error || 'Không thể tạo người dùng'));
+      }
+    } catch (err) {
+      alert('Lỗi kết nối');
+    } finally {
+      setAddingUser(false);
+    }
   };
 
   const columns: ColumnDef<User>[] = [
@@ -253,18 +340,26 @@ export default function AdminPage() {
             <span className="text-sm font-medium">Settings</span>
           </a>
           <a className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group" href="#" onClick={async () => {
-             await supabase.auth.signOut();
-             router.push('/auth');
-           }}>
+            await supabase.auth.signOut();
+            router.push('/auth');
+          }}>
             <span className="material-symbols-outlined text-[22px] group-hover:text-red-500">logout</span>
             <span className="text-sm font-medium">Logout</span>
           </a>
         </nav>
         <div className="p-4 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-full bg-slate-200"></div>
+            <div className="size-9 rounded-full bg-slate-200 overflow-hidden">
+              <img
+                src={adminProfile?.avatar_id ? `/avatar/avatar_${adminProfile.avatar_id}.png` : '/avatar/avatar_1.png'}
+                alt="Admin"
+                className="w-full h-full object-cover"
+              />
+            </div>
             <div className="flex flex-col">
-              <p className="text-sm font-medium text-slate-900 dark:text-white">Admin</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white truncate max-w-[120px]">
+                {adminProfile?.display_name || 'Admin'}
+              </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Super Admin</p>
             </div>
           </div>
@@ -281,7 +376,13 @@ export default function AdminPage() {
             </button>
             <span className="font-bold">VocaAI</span>
           </div>
-          <div className="size-8 rounded-full bg-slate-200"></div>
+          <div className="size-8 rounded-full bg-slate-200 overflow-hidden">
+            <img
+              src={adminProfile?.avatar_id ? `/avatar/avatar_${adminProfile.avatar_id}.png` : '/avatar/avatar_1.png'}
+              alt="Admin"
+              className="w-full h-full object-cover"
+            />
+          </div>
         </header>
 
         {/* Content Scroll Area */}
@@ -298,7 +399,10 @@ export default function AdminPage() {
                   <span className="material-symbols-outlined text-[20px]">file_upload</span>
                   Export
                 </button>
-                <button className="flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-700 text-white text-sm font-bold shadow-sm shadow-blue-500/30 transition-all">
+                <button
+                  onClick={() => setShowAddUserModal(true)}
+                  className="flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-700 text-white text-sm font-bold shadow-sm shadow-blue-500/30 transition-all"
+                >
                   <span className="material-symbols-outlined text-[20px]">add</span>
                   Add New User
                 </button>
@@ -369,7 +473,7 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                       <th className="p-4 w-12">
-                        <input className="rounded border-slate-300 text-primary focus:ring-primary bg-white dark:bg-slate-800 dark:border-slate-600" type="checkbox"/>
+                        <input className="rounded border-slate-300 text-primary focus:ring-primary bg-white dark:bg-slate-800 dark:border-slate-600" type="checkbox" />
                       </th>
                       <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">User</th>
                       <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Role</th>
@@ -382,11 +486,11 @@ export default function AdminPage() {
                     {table.getRowModel().rows.map((row) => (
                       <tr key={row.original.user_id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" onContextMenu={(e) => handleRightClick(e, row.original)}>
                         <td className="p-4">
-                          <input className="rounded border-slate-300 text-primary focus:ring-primary bg-white dark:bg-slate-800 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" type="checkbox"/>
+                          <input className="rounded border-slate-300 text-primary focus:ring-primary bg-white dark:bg-slate-800 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" type="checkbox" />
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-full bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${row.original.avatar_id ? `/avatar/avatar${row.original.avatar_id}.png` : '/avatar/avatar1.png'})` }}></div>
+                            <div className="size-10 rounded-full bg-cover bg-center shrink-0" style={{ backgroundImage: `url(${row.original.avatar_id ? `/avatar/avatar_${row.original.avatar_id}.png` : '/avatar/avatar_1.png'})` }}></div>
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{row.original.full_name || 'Chưa cập nhật'}</span>
                               <span className="text-xs text-slate-500 dark:text-slate-400">ID: {row.original.user_id.slice(0, 8)}...</span>
@@ -489,8 +593,15 @@ export default function AdminPage() {
               {contextMenu.user.status === 'locked' ? 'Mở khóa' : 'Khóa'}
             </button>
             <button
+              onClick={() => handleDeleteUser(contextMenu.user.user_id)}
+              className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg"
+            >
+              <span className="material-symbols-outlined text-[16px]">delete</span>
+              Xóa người dùng
+            </button>
+            <button
               onClick={() => navigator.clipboard.writeText(contextMenu.user.user_id)}
-              className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border-t border-gray-100 dark:border-gray-700 mt-1"
             >
               <Copy size={16} />
               Copy User ID
@@ -532,7 +643,7 @@ export default function AdminPage() {
                 {/* User Info */}
                 <div className="flex flex-col items-center text-center mb-8">
                   <div className="relative mb-3">
-                    <div className="w-24 h-24 rounded-full bg-cover bg-center overflow-hidden border-4 border-white dark:border-slate-900 shadow-lg ring-2 ring-slate-100 dark:ring-slate-700" style={{ backgroundImage: `url(${selectedUser.avatar_id ? `/avatar/avatar${selectedUser.avatar_id}.png` : '/avatar/avatar1.png'})` }}></div>
+                    <div className="w-24 h-24 rounded-full bg-cover bg-center overflow-hidden border-4 border-white dark:border-slate-900 shadow-lg ring-2 ring-slate-100 dark:ring-slate-700" style={{ backgroundImage: `url(${selectedUser.avatar_id ? `/avatar/avatar_${selectedUser.avatar_id}.png` : '/avatar/avatar_1.png'})` }}></div>
                     <span className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full" title="Online"></span>
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedUser.full_name || 'User'}</h3>

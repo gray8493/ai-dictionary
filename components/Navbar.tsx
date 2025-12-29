@@ -9,7 +9,7 @@ import type { User } from '@supabase/supabase-js';
 export default function Navbar() {
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +61,13 @@ export default function Navbar() {
       else { setUserProfile(null); setIsAdmin(false); }
     });
 
+    const handleProfileUpdate = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) fetchUserProfile(session.user.id);
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsUserDropdownOpen(false);
@@ -71,13 +78,14 @@ export default function Navbar() {
       mounted = false;
       authListener.subscription.unsubscribe();
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
     };
   }, []);
 
   return (
     <header className="sticky top-0 z-[100] w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 h-20 shadow-sm">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
-        
+
         {/* NHÓM BÊN TRÁI: LOGO + NAV LINKS */}
         <div className="flex items-center gap-10">
           {/* LOGO */}
@@ -92,11 +100,10 @@ export default function Navbar() {
           <nav className="hidden lg:flex items-center gap-1 bg-gray-50/50 dark:bg-gray-800/40 p-1 rounded-2xl border border-gray-100 dark:border-gray-700/50">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}
-                className={`px-4 py-2 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
-                  pathname === link.href 
-                  ? 'bg-white dark:bg-gray-900 text-primary shadow-sm' 
+                className={`px-4 py-2 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${pathname === link.href
+                  ? 'bg-white dark:bg-gray-900 text-primary shadow-sm'
                   : 'text-slate-500 hover:text-primary dark:text-gray-400'
-                }`}
+                  }`}
               >
                 {link.name}
               </Link>
@@ -122,14 +129,16 @@ export default function Navbar() {
 
               {/* Avatar & Dropdown Cá nhân */}
               <div className="relative" ref={dropdownRef}>
-                <button 
+                <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className="flex items-center gap-1 p-1 rounded-full border-2 border-primary/20 hover:border-primary transition-all bg-white dark:bg-gray-900"
                 >
-                  <img 
-                    src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} 
-                    alt="avatar" 
-                    className="size-9 rounded-full object-cover" 
+                  <img
+                    src={userProfile?.avatar_id
+                      ? `/avatar/avatar_${userProfile.avatar_id}.png?t=${Date.now()}`
+                      : user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`}
+                    alt="avatar"
+                    className="size-9 rounded-full object-cover"
                   />
                   <span className={`material-symbols-outlined text-slate-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}>
                     expand_more
@@ -143,7 +152,7 @@ export default function Navbar() {
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tài khoản</p>
                       <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user.email}</p>
                     </div>
-                    
+
                     <Link href="/profile" onClick={() => setIsUserDropdownOpen(false)} className="flex items-center gap-3 px-6 py-3.5 hover:bg-primary/5 text-slate-700 dark:text-gray-300 font-bold text-sm">
                       <span className="material-symbols-outlined text-primary">person</span> Hồ sơ cá nhân
                     </Link>
@@ -155,7 +164,7 @@ export default function Navbar() {
                     )}
 
                     <div className="h-px bg-gray-50 dark:bg-gray-800 my-2 mx-4" />
-                    
+
                     <button onClick={() => { supabase.auth.signOut(); window.location.href = '/'; }} className="w-full flex items-center gap-3 px-6 py-3.5 hover:bg-red-50 text-red-500 font-bold text-sm transition-colors">
                       <span className="material-symbols-outlined">logout</span> Đăng xuất
                     </button>
@@ -183,9 +192,8 @@ export default function Navbar() {
             <div className="space-y-1">
               {navLinks.map(link => (
                 <Link key={link.href} href={link.href} onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
-                    pathname === link.href ? 'bg-primary text-white shadow-lg' : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${pathname === link.href ? 'bg-primary text-white shadow-lg' : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50'
+                    }`}
                 >
                   <span className="material-symbols-outlined">{link.icon}</span> {link.name}
                 </Link>

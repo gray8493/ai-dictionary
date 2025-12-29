@@ -107,10 +107,18 @@ export default function Profile() {
       });
 
       if (response.ok) {
-        fetchUserProfile();
-        setShowAvatarSelector(false);
+        const result = await response.json();
+        if (result.success) {
+          setUserProfile((prev: any) => ({ ...prev, avatar_id: avatarId }));
+          setShowAvatarSelector(false);
+          // Gửi sự kiện để Navbar cập nhật theo
+          window.dispatchEvent(new Event('profileUpdated'));
+        } else {
+          alert('Không thể cập nhật avatar: ' + (result.error || 'Lỗi không xác định'));
+        }
       } else {
-        alert('Không thể cập nhật avatar');
+        const errorData = await response.json();
+        alert('Không thể cập nhật avatar: ' + (errorData.error || response.statusText));
       }
     } catch (error) {
       alert('Lỗi khi cập nhật avatar');
@@ -234,271 +242,271 @@ export default function Profile() {
       <div className="min-h-screen bg-background-light dark:bg-background-dark">
         <Navbar />
         <div className="p-8 bg-slate-50 dark:bg-slate-950 font-display">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Card thông tin chính */}
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-xl border border-slate-100 dark:border-slate-800 text-center">
-            <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center relative group">
-               <img
-                 src={`/avatar/avatar_${userProfile.avatar_id || 1}.png?t=${Date.now()}`}
-                 alt="Avatar"
-                 className="size-24 rounded-full object-cover border-4 border-white dark:border-slate-800"
-               />
-               <button
-                 onClick={() => setShowAvatarSelector(true)}
-                 className="absolute -bottom-2 -right-2 bg-primary text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-               >
-                 <span className="material-symbols-outlined text-lg">edit</span>
-               </button>
-            </div>
-
-            <div className="mb-2">
-              <div className="flex items-center justify-center">
-                <h1 className="text-3xl font-black">
-                  {userProfile.first_name && userProfile.last_name
-                    ? `${userProfile.first_name} ${userProfile.last_name}`
-                    : userProfile.display_name || user.email?.split('@')[0] || 'User'
-                  }
-                </h1>
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Card thông tin chính */}
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-xl border border-slate-100 dark:border-slate-800 text-center">
+              <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center relative group">
+                <img
+                  src={`/avatar/avatar_${userProfile.avatar_id || 1}.png?t=${Date.now()}`}
+                  alt="Avatar"
+                  className="size-24 rounded-full object-cover border-4 border-white dark:border-slate-800"
+                />
+                <button
+                  onClick={() => setShowAvatarSelector(true)}
+                  className="absolute -bottom-2 -right-2 bg-primary text-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-lg">edit</span>
+                </button>
               </div>
-            </div>
 
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">{getLevelName(userProfile.level)}</p>
-              {userProfile.is_pro && (
-                <span className="px-2 py-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-black rounded-full shadow-sm">
-                  PRO
-                </span>
-              )}
-            </div>
-
-            {/* Thanh XP lớn */}
-            <div className="mt-8 space-y-2">
-              <div className="flex justify-between text-sm font-black">
-                <span>{userProfile.xp} XP</span>
-                <span className="text-slate-400">{nextLevelXP} XP</span>
+              <div className="mb-2">
+                <div className="flex items-center justify-center">
+                  <h1 className="text-3xl font-black">
+                    {userProfile.first_name && userProfile.last_name
+                      ? `${userProfile.first_name} ${userProfile.last_name}`
+                      : userProfile.display_name || user.email?.split('@')[0] || 'User'
+                    }
+                  </h1>
+                </div>
               </div>
-              <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div style={{ width: `${Math.min(progress, 100)}%` }} className="h-full bg-primary shadow-[0_0_15px_rgba(43,189,238,0.5)] transition-all duration-1000"></div>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                {userProfile.level >= 4 ? 'Bạn đã đạt cấp cao nhất!' : `Bạn cần ${xpNeededForNextLevel - xpInCurrentLevel} XP nữa để lên cấp ${getNextLevelName(userProfile.level)}`}
-              </p>
-            </div>
-          </div>
 
-          {/* Card số liệu thống kê */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-              <p className="text-slate-400 text-xs font-bold uppercase">Số từ đã lưu</p>
-              <p className="text-3xl font-black text-primary">{userProfile.total_vocabularies || 0}</p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-              <p className="text-slate-400 text-xs font-bold uppercase">Từ đã thuộc</p>
-              <p className="text-3xl font-black text-green-500">{userProfile.mastered_vocabularies || 0}</p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-              <p className="text-slate-400 text-xs font-bold uppercase">XP tuần này</p>
-              <p className="text-3xl font-black text-orange-500">{userProfile.weekly_xp || 0}</p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-              <p className="text-slate-400 text-xs font-bold uppercase">Từ thuộc tuần</p>
-              <p className="text-3xl font-black text-purple-500">{userProfile.weekly_mastered || 0}</p>
-            </div>
-          </div>
-
-          {/* Personal Information */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">Thông tin cá nhân</h3>
-              <button
-                onClick={() => {
-                  if (editingProfile) {
-                    saveProfileData();
-                  } else {
-                    setEditingProfile(true);
-                  }
-                }}
-                disabled={savingProfile}
-                className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {savingProfile ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <span className="material-symbols-outlined text-sm">
-                    {editingProfile ? 'save' : 'edit'}
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">{getLevelName(userProfile.level)}</p>
+                {userProfile.is_pro && (
+                  <span className="px-2 py-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-black rounded-full shadow-sm">
+                    PRO
                   </span>
                 )}
-                {editingProfile ? 'Lưu' : 'Chỉnh sửa'}
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Tên</label>
-                  {editingProfile ? (
-                    <input
-                      type="text"
-                      value={profileData.first_name}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
-                      placeholder="Nhập tên"
-                    />
-                  ) : (
-                    <p className="text-slate-900 dark:text-white font-medium">{userProfile.first_name || 'Chưa cập nhật'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Họ</label>
-                  {editingProfile ? (
-                    <input
-                      type="text"
-                      value={profileData.last_name}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
-                      placeholder="Nhập họ"
-                    />
-                  ) : (
-                    <p className="text-slate-900 dark:text-white font-medium">{userProfile.last_name || 'Chưa cập nhật'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Giới tính</label>
-                  {editingProfile ? (
-                    <select
-                      value={profileData.gender}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, gender: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
-                    >
-                      <option value="male">Nam</option>
-                      <option value="female">Nữ</option>
-                    </select>
-                  ) : (
-                    <p className="text-slate-900 dark:text-white font-medium">
-                      {userProfile.gender === 'male' ? 'Nam' : userProfile.gender === 'female' ? 'Nữ' : 'Chưa cập nhật'}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Vai trò</label>
-                  {editingProfile ? (
-                    <select
-                      value={profileData.role}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, role: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
-                    >
-                      <option value="student">Học sinh</option>
-                      <option value="teacher">Giáo viên</option>
-                    </select>
-                  ) : (
-                    <p className="text-slate-900 dark:text-white font-medium">
-                      {userProfile.role === 'student' ? 'Học sinh' : userProfile.role === 'teacher' ? 'Giáo viên' : 'Chưa cập nhật'}
-                    </p>
-                  )}
-                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Email</label>
-                <p className="text-slate-900 dark:text-white font-medium">{userProfile.email}</p>
+              {/* Thanh XP lớn */}
+              <div className="mt-8 space-y-2">
+                <div className="flex justify-between text-sm font-black">
+                  <span>{userProfile.xp} XP</span>
+                  <span className="text-slate-400">{nextLevelXP} XP</span>
+                </div>
+                <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div style={{ width: `${Math.min(progress, 100)}%` }} className="h-full bg-primary shadow-[0_0_15px_rgba(43,189,238,0.5)] transition-all duration-1000"></div>
+                </div>
+                <p className="text-xs text-slate-400 font-medium">
+                  {userProfile.level >= 4 ? 'Bạn đã đạt cấp cao nhất!' : `Bạn cần ${xpNeededForNextLevel - xpInCurrentLevel} XP nữa để lên cấp ${getNextLevelName(userProfile.level)}`}
+                </p>
+              </div>
+            </div>
+
+            {/* Card số liệu thống kê */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                <p className="text-slate-400 text-xs font-bold uppercase">Số từ đã lưu</p>
+                <p className="text-3xl font-black text-primary">{userProfile.total_vocabularies || 0}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                <p className="text-slate-400 text-xs font-bold uppercase">Từ đã thuộc</p>
+                <p className="text-3xl font-black text-green-500">{userProfile.mastered_vocabularies || 0}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                <p className="text-slate-400 text-xs font-bold uppercase">XP tuần này</p>
+                <p className="text-3xl font-black text-orange-500">{userProfile.weekly_xp || 0}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                <p className="text-slate-400 text-xs font-bold uppercase">Từ thuộc tuần</p>
+                <p className="text-3xl font-black text-purple-500">{userProfile.weekly_mastered || 0}</p>
+              </div>
+            </div>
+
+            {/* Personal Information */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg">Thông tin cá nhân</h3>
+                <button
+                  onClick={() => {
+                    if (editingProfile) {
+                      saveProfileData();
+                    } else {
+                      setEditingProfile(true);
+                    }
+                  }}
+                  disabled={savingProfile}
+                  className="flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {savingProfile ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <span className="material-symbols-outlined text-sm">
+                      {editingProfile ? 'save' : 'edit'}
+                    </span>
+                  )}
+                  {editingProfile ? 'Lưu' : 'Chỉnh sửa'}
+                </button>
               </div>
 
-              {editingProfile && (
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={saveProfileData}
-                    disabled={savingProfile}
-                    className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 font-medium"
-                  >
-                    {savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingProfile(false);
-                      setProfileData({
-                        first_name: userProfile.first_name || '',
-                        last_name: userProfile.last_name || '',
-                        gender: userProfile.gender || 'male',
-                        role: userProfile.role || 'student'
-                      });
-                    }}
-                    className="px-4 py-2 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-400 dark:hover:bg-slate-600 font-medium"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Subscription Status */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-            <h3 className="font-bold text-lg mb-4">💎 Gói dịch vụ</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${userProfile.is_pro ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      {userProfile.is_pro ? 'Gói Pro' : 'Gói Free'}
-                    </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {userProfile.is_pro ? 'Tất cả tính năng AI không giới hạn' : '3 lần dùng AI miễn phí mỗi tháng'}
-                    </p>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Tên</label>
+                    {editingProfile ? (
+                      <input
+                        type="text"
+                        value={profileData.first_name}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                        placeholder="Nhập tên"
+                      />
+                    ) : (
+                      <p className="text-slate-900 dark:text-white font-medium">{userProfile.first_name || 'Chưa cập nhật'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Họ</label>
+                    {editingProfile ? (
+                      <input
+                        type="text"
+                        value={profileData.last_name}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                        placeholder="Nhập họ"
+                      />
+                    ) : (
+                      <p className="text-slate-900 dark:text-white font-medium">{userProfile.last_name || 'Chưa cập nhật'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Giới tính</label>
+                    {editingProfile ? (
+                      <select
+                        value={profileData.gender}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, gender: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                      >
+                        <option value="male">Nam</option>
+                        <option value="female">Nữ</option>
+                      </select>
+                    ) : (
+                      <p className="text-slate-900 dark:text-white font-medium">
+                        {userProfile.gender === 'male' ? 'Nam' : userProfile.gender === 'female' ? 'Nữ' : 'Chưa cập nhật'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Vai trò</label>
+                    {editingProfile ? (
+                      <select
+                        value={profileData.role}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, role: e.target.value }))}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 focus:ring-2 focus:ring-primary/50 outline-none dark:text-white"
+                      >
+                        <option value="student">Học sinh</option>
+                        <option value="teacher">Giáo viên</option>
+                      </select>
+                    ) : (
+                      <p className="text-slate-900 dark:text-white font-medium">
+                        {userProfile.role === 'student' ? 'Học sinh' : userProfile.role === 'teacher' ? 'Giáo viên' : 'Chưa cập nhật'}
+                      </p>
+                    )}
                   </div>
                 </div>
-                {userProfile.is_pro && userProfile.subscription_expires_at && (
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Hết hạn</p>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">
-                      {new Date(userProfile.subscription_expires_at).toLocaleDateString('vi-VN')}
-                    </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Email</label>
+                  <p className="text-slate-900 dark:text-white font-medium">{userProfile.email}</p>
+                </div>
+
+                {editingProfile && (
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={saveProfileData}
+                      disabled={savingProfile}
+                      className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 font-medium"
+                    >
+                      {savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingProfile(false);
+                        setProfileData({
+                          first_name: userProfile.first_name || '',
+                          last_name: userProfile.last_name || '',
+                          gender: userProfile.gender || 'male',
+                          role: userProfile.role || 'student'
+                        });
+                      }}
+                      className="px-4 py-2 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-400 dark:hover:bg-slate-600 font-medium"
+                    >
+                      Hủy
+                    </button>
                   </div>
                 )}
               </div>
+            </div>
 
-              {!userProfile.is_pro && (
-                <div className="text-center pt-2">
-                  <Link
-                    href="/upgrade"
-                    className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
-                  >
-                    <span className="material-symbols-outlined">upgrade</span>
-                    Nâng cấp Pro
-                  </Link>
+            {/* Subscription Status */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-lg mb-4">💎 Gói dịch vụ</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${userProfile.is_pro ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white">
+                        {userProfile.is_pro ? 'Gói Pro' : 'Gói Free'}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        {userProfile.is_pro ? 'Tất cả tính năng AI không giới hạn' : '3 lần dùng AI miễn phí mỗi tháng'}
+                      </p>
+                    </div>
+                  </div>
+                  {userProfile.is_pro && userProfile.subscription_expires_at && (
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Hết hạn</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">
+                        {new Date(userProfile.subscription_expires_at).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {!userProfile.is_pro && (
+                  <div className="text-center pt-2">
+                    <Link
+                      href="/upgrade"
+                      className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+                    >
+                      <span className="material-symbols-outlined">upgrade</span>
+                      Nâng cấp Pro
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Achievement Section */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-lg mb-4">🏆 Thành tựu gần đây</h3>
+              <div className="space-y-3">
+                {userProfile.xp >= 100 && (
+                  <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
+                    <span className="material-symbols-outlined text-yellow-600">workspace_premium</span>
+                    <div>
+                      <p className="font-bold text-yellow-800 dark:text-yellow-200">Đầu tiên 100 XP!</p>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400">Bạn đã bắt đầu hành trình học tập</p>
+                    </div>
+                  </div>
+                )}
+                {userProfile.mastered_vocabularies >= 10 && (
+                  <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                    <span className="material-symbols-outlined text-green-600">check_circle</span>
+                    <div>
+                      <p className="font-bold text-green-800 dark:text-green-200">10 từ đã thuộc!</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">Tiếp tục phát huy</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Achievement Section */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-            <h3 className="font-bold text-lg mb-4">🏆 Thành tựu gần đây</h3>
-            <div className="space-y-3">
-              {userProfile.xp >= 100 && (
-                <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
-                  <span className="material-symbols-outlined text-yellow-600">workspace_premium</span>
-                  <div>
-                    <p className="font-bold text-yellow-800 dark:text-yellow-200">Đầu tiên 100 XP!</p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400">Bạn đã bắt đầu hành trình học tập</p>
-                  </div>
-                </div>
-              )}
-              {userProfile.mastered_vocabularies >= 10 && (
-                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                  <span className="material-symbols-outlined text-green-600">check_circle</span>
-                  <div>
-                    <p className="font-bold text-green-800 dark:text-green-200">10 từ đã thuộc!</p>
-                    <p className="text-xs text-green-600 dark:text-green-400">Tiếp tục phát huy</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
         </div>
 
         {/* Avatar Selector Modal */}
@@ -517,25 +525,27 @@ export default function Profile() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((avatarId) => (
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((id) => (
                     <button
-                      key={avatarId}
-                      onClick={() => saveAvatar(avatarId)}
+                      key={id}
+                      onClick={() => {
+                        console.log('Button clicked for avatar:', id);
+                        saveAvatar(id);
+                      }}
                       disabled={savingAvatar}
-                      className={`aspect-square rounded-xl border-2 transition-all ${
-                        userProfile.avatar_id === avatarId
-                          ? 'border-primary bg-primary/10'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                      } ${savingAvatar ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`aspect-square rounded-xl border-2 transition-all relative ${userProfile.avatar_id === id
+                        ? 'border-primary bg-primary/10'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                        } ${savingAvatar ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <img
-                        src={`/avatar/avatar_${avatarId}.png`}
-                        alt={`Avatar ${avatarId}`}
+                        src={`/avatar/avatar_${id}.png?v=${id}`}
+                        alt={`Avatar ${id}`}
                         className="w-full h-full rounded-lg object-cover"
                       />
-                      {userProfile.avatar_id === avatarId && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="bg-primary text-white rounded-full p-1">
+                      {userProfile.avatar_id === id && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="bg-primary text-white rounded-full p-1 shadow-lg">
                             <span className="material-symbols-outlined text-sm">check</span>
                           </div>
                         </div>
