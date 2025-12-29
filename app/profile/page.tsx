@@ -107,7 +107,7 @@ export default function Profile() {
       });
 
       if (response.ok) {
-        setUserProfile((prev: any) => ({ ...prev, avatar_id: avatarId }));
+        fetchUserProfile();
         setShowAvatarSelector(false);
       } else {
         alert('Không thể cập nhật avatar');
@@ -239,7 +239,7 @@ export default function Profile() {
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-xl border border-slate-100 dark:border-slate-800 text-center">
             <div className="size-28 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center relative group">
                <img
-                 src={`/avatar/avatar${userProfile.avatar_id || 1}.png`}
+                 src={`/avatar/avatar_${userProfile.avatar_id || 1}.png?t=${Date.now()}`}
                  alt="Avatar"
                  className="size-24 rounded-full object-cover border-4 border-white dark:border-slate-800"
                />
@@ -529,7 +529,7 @@ export default function Profile() {
                       } ${savingAvatar ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <img
-                        src={`/avatar/avatar${avatarId}.png`}
+                        src={`/avatar/avatar_${avatarId}.png`}
                         alt={`Avatar ${avatarId}`}
                         className="w-full h-full rounded-lg object-cover"
                       />

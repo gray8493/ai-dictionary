@@ -25,25 +25,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Use service role for select to avoid cache issues
+    const supabaseAdmin = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     // Get user profile with subscription info
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .select(`
-        id,
-        user_id,
-        xp,
-        level,
-        total_vocabularies,
-        mastered_vocabularies,
-        weekly_xp,
-        weekly_mastered,
-        created_at,
-        updated_at,
-        is_pro,
-        ai_credits,
-        display_name,
-        subscription_expires_at
-      `)
+      .select('*')
       .eq('user_id', user.id)
       .single();
 
@@ -70,6 +63,7 @@ export async function GET(req: NextRequest) {
           ai_credits: 3,
           display_name,
           subscription_expires_at: null,
+          avatar_id: 1,
         });
 
       if (insertError) {
@@ -78,24 +72,9 @@ export async function GET(req: NextRequest) {
       }
 
       // Fetch the newly created profile
-      const { data: newProfile, error: fetchError } = await supabase
+      const { data: newProfile, error: fetchError } = await supabaseAdmin
         .from('user_profiles')
-        .select(`
-          id,
-          user_id,
-          xp,
-          level,
-          total_vocabularies,
-          mastered_vocabularies,
-          weekly_xp,
-          weekly_mastered,
-          created_at,
-          updated_at,
-          is_pro,
-          ai_credits,
-          display_name,
-          subscription_expires_at
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .single();
 
@@ -112,7 +91,7 @@ export async function GET(req: NextRequest) {
         gender: user.user_metadata?.gender || 'male',
         role: user.user_metadata?.role || 'student',
         email: user.email,
-        avatar_id: 1
+        avatar_id: newProfile.avatar_id || 1
       };
 
       return NextResponse.json({
@@ -129,7 +108,7 @@ export async function GET(req: NextRequest) {
       gender: user.user_metadata?.gender || 'male',
       role: user.user_metadata?.role || 'student',
       email: user.email,
-      avatar_id: 1
+      avatar_id: profile.avatar_id || 1
     };
 
     return NextResponse.json({
@@ -230,31 +209,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'update_avatar' && avatar_id !== undefined) {
-      // Update avatar (will work once migration is run)
-      try {
-        const { error } = await supabase
-          .from('user_profiles')
-          .update({
-            avatar_id: avatar_id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
+      // Update avatar
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          avatar_id: avatar_id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
-        if (error) {
-          console.error('Avatar update error:', error);
-          // If column doesn't exist yet, return success anyway
-          if (error.message?.includes('avatar_id')) {
-            return NextResponse.json({ success: true, avatar_id });
-          }
-          return NextResponse.json({ error: 'Failed to update avatar' }, { status: 500 });
+      if (error) {
+        console.error('Avatar update error:', error);
+        // If column doesn't exist yet, return success anyway
+        if (error.message?.includes('avatar_id')) {
+          return NextResponse.json({ success: true, avatar_id });
         }
-
-        return NextResponse.json({ success: true, avatar_id });
-      } catch (error) {
-        console.error('Avatar update exception:', error);
-        // Return success for now if migration not run
-        return NextResponse.json({ success: true, avatar_id });
+        return NextResponse.json({ error: 'Failed to update avatar' }, { status: 500 });
       }
+
+      return NextResponse.json({ success: true, avatar_id });
     }
 
     if (action === 'update_profile' && (first_name !== undefined || last_name !== undefined || gender !== undefined || role !== undefined)) {
