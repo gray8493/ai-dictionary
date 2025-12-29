@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -8,12 +8,14 @@ import type { User } from '@supabase/supabase-js';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [isPro, setIsPro] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
   const navLinks = [
     { name: 'Trang chủ', href: '/', icon: 'home' },
@@ -24,310 +26,178 @@ export default function Navbar() {
     { name: 'Bảng xếp hạng', href: '/leaderboard', icon: 'leaderboard' },
   ];
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
+  const fetchUserProfile = async (userId: string) => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) {
-        console.error('Login error:', error);
-        alert('Đăng nhập thất bại: ' + error.message);
-        setLoading(false);
-      }
-      // Don't set loading false here - page will redirect
-    } catch (err) {
-      console.error('Login failed:', err);
-      alert('Đăng nhập thất bại');
-      setLoading(false);
-    }
-  };
-
-  const fetchUserProfile = async () => {
-    try {
-      setProfileLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) return;
-
-      const response = await fetch('/api/user-profile', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setUserProfile(result.data);
-      } else {
-        // Set default profile on API failure
-        setUserProfile({
-          id: null,
-          user_id: session.user.id,
-          xp: 0,
-          level: 1,
-          total_vocabularies: 0,
-          mastered_vocabularies: 0,
-          weekly_xp: 0,
-          weekly_mastered: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      if (data) {
+        setUserProfile(data);
+        setIsAdmin(data.role === 'admin');
       }
     } catch (err) {
-      console.error('Error fetching user profile:', err);
-      // Set default profile on error
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setUserProfile({
-            id: null,
-            user_id: session.user.id,
-            xp: 0,
-            level: 1,
-            total_vocabularies: 0,
-            mastered_vocabularies: 0,
-            weekly_xp: 0,
-            weekly_mastered: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        }
-      } catch (sessionErr) {
-        console.error('Error getting session:', sessionErr);
-      }
-    } finally {
-      setProfileLoading(false);
+      console.error('Error fetching profile:', err);
     }
   };
 
   useEffect(() => {
     let mounted = true;
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted && session?.user) {
+        setUser(session.user);
+        await fetchUserProfile(session.user.id);
+      }
+      setLoading(false);
+    };
+    initAuth();
 
-    const getUser = async () => {
-      try {
-        console.log('Navbar - checking auth...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      setUser(session?.user ?? null);
+      if (session?.user) fetchUserProfile(session.user.id);
+      else { setUserProfile(null); setIsAdmin(false); }
+    });
 
-        if (!mounted) return;
-
-        if (error) {
-          console.error('Auth session error:', error);
-          if (mounted) setLoading(false);
-          return;
-        }
-
-        const currentUser = session?.user ?? null;
-        console.log('Navbar - user:', currentUser?.email || 'null');
-        if (mounted) setUser(currentUser);
-
-        if (currentUser) {
-          await fetchUserProfile();
-          const proStatus = await checkIsPro(currentUser);
-          if (mounted) setIsPro(proStatus);
-        } else {
-          if (mounted) setIsPro(false);
-        }
-      } catch (err) {
-        console.error('Auth check failed:', err);
-      } finally {
-        if (mounted) setLoading(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsUserDropdownOpen(false);
       }
     };
-
-    getUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-
-        console.log('Auth state changed:', event, !!session?.user);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          fetchUserProfile();
-          const proStatus = await checkIsPro(currentUser);
-          if (mounted) setIsPro(proStatus);
-        } else {
-          setIsPro(false);
-        }
-
-        if (mounted) setLoading(false);
-      }
-    );
-
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       mounted = false;
       authListener.subscription.unsubscribe();
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const getLevelName = (level: number) => {
-    if (level === 1) return "Newbie";
-    if (level === 2) return "Learner";
-    if (level === 3) return "Scholar";
-    return "Master";
-  };
-
-  const getNextLevelXP = (currentLevel: number) => {
-    if (currentLevel === 1) return 501; // To reach Learner
-    if (currentLevel === 2) return 1501; // To reach Scholar
-    if (currentLevel === 3) return 5001; // To reach Master
-    return 5001; // Max level
-  };
-
-  const progress = userProfile ? (userProfile.xp / getNextLevelXP(userProfile.level)) * 100 : 0;
-
-
-
   return (
-    <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200/80 dark:border-gray-700/50 px-6 sm:px-10 py-4">
-      <div className="flex items-center gap-4 text-slate-900 dark:text-white">
-        <Link href="/" className="font-black text-xl text-primary flex items-center gap-2">
-          <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
-            <span className="material-symbols-outlined text-[20px]">school</span>
-          </div>
-          <span className="hidden md:block">VocaAI</span>
-        </Link>
-      </div>
-
-      <div className="hidden lg:flex flex-1 justify-center gap-8">
-        <div className="flex items-center gap-9">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === link.href ? 'text-primary font-bold' : 'text-slate-600 dark:text-gray-400 hover:text-primary'
-              }`}
-            >
-              {link.name}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-4">
-        {/* Mobile menu button */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="lg:hidden p-2 text-slate-600 dark:text-gray-400 hover:text-primary"
-        >
-          <span className="material-symbols-outlined">
-            {isMobileMenuOpen ? 'close' : 'menu'}
-          </span>
-        </button>
-
-        {!loading && user ? (
-          <div className="flex items-center gap-4">
-            {userProfile && (
-              <div className="hidden md:flex items-center gap-4">
-                {user.user_metadata?.avatar_url && (
-                  <img
-                    src={user.user_metadata.avatar_url}
-                    alt="Avatar"
-                    className="w-10 h-10 rounded-full border-2 border-primary"
-                  />
-                )}
-                <div className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 rounded-full">
-                  <span className="text-yellow-600 dark:text-yellow-400 text-sm">⭐</span>
-                  <span className="text-yellow-800 dark:text-yellow-200 font-bold">
-                    {userProfile.level}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
-                  <span className="text-blue-600 dark:text-blue-400 text-sm">⚡</span>
-                  <span className="text-blue-800 dark:text-blue-200 font-bold">
-                    {userProfile.xp} XP
-                  </span>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Link href="/profile" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
-                Hồ sơ
-              </Link>
-              <Link href="/leaderboard" className="text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary">
-                Bảng xếp hạng
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="min-w-[84px] cursor-pointer items-center justify-center rounded-full h-10 px-4 bg-red-500 text-white text-sm font-bold leading-normal tracking-[0.015em]"
-              >
-                Đăng xuất
-              </button>
+    <header className="sticky top-0 z-[100] w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 h-20 shadow-sm">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
+        
+        {/* NHÓM BÊN TRÁI: LOGO + NAV LINKS */}
+        <div className="flex items-center gap-10">
+          {/* LOGO */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <div className="size-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+              <span className="material-symbols-outlined text-[24px]">school</span>
             </div>
-          </div>
-        ) : null}
-      </div>
+            <span className="font-black text-xl text-slate-900 dark:text-white hidden lg:block">VocaAI</span>
+          </Link>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="lg:hidden fixed inset-0 top-[73px] bg-black/50 z-40"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-          <div className="lg:hidden fixed inset-0 top-[73px] bg-white dark:bg-gray-900 z-50 border-t border-gray-200 dark:border-gray-700">
-            <nav className="flex flex-col py-4">
+          {/* MENU CHÍNH (Sát cạnh Logo) */}
+          <nav className="hidden lg:flex items-center gap-1 bg-gray-50/50 dark:bg-gray-800/40 p-1 rounded-2xl border border-gray-100 dark:border-gray-700/50">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
-                  pathname === link.href
-                    ? 'text-primary bg-primary/5 border-r-2 border-primary'
-                    : 'text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800'
+              <Link key={link.href} href={link.href}
+                className={`px-4 py-2 text-sm font-bold rounded-xl transition-all whitespace-nowrap ${
+                  pathname === link.href 
+                  ? 'bg-white dark:bg-gray-900 text-primary shadow-sm' 
+                  : 'text-slate-500 hover:text-primary dark:text-gray-400'
                 }`}
               >
-                <span className="material-symbols-outlined text-lg">{link.icon}</span>
                 {link.name}
               </Link>
             ))}
-            {!loading && user && (
-              <>
-                <Link
-                  href="/profile"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <span className="material-symbols-outlined text-lg">person</span>
-                  Hồ sơ
-                </Link>
-                <Link
-                  href="/leaderboard"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-600 dark:text-gray-400 hover:text-primary hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <span className="material-symbols-outlined text-lg">leaderboard</span>
-                  Bảng xếp hạng
-                </Link>
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <span className="material-symbols-outlined text-lg">logout</span>
-                  Đăng xuất
-                </button>
-              </>
-            )}
           </nav>
+        </div>
+
+        {/* NHÓM BÊN PHẢI: STATS + DROPDOWN */}
+        <div className="flex items-center gap-3 shrink-0">
+          {!loading && user ? (
+            <>
+              {/* Cụm Stats (XP & Level) - Luôn hiển thị */}
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-gray-800/40 p-1.5 rounded-2xl border border-slate-100 dark:border-gray-700">
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-yellow-100">
+                  <span className="text-sm">⭐</span>
+                  <span className="text-sm font-black text-slate-700 dark:text-gray-200">Lv.{userProfile?.level || 1}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-blue-100">
+                  <span className="text-sm text-blue-500 font-bold">⚡</span>
+                  <span className="text-sm font-black text-slate-700 dark:text-gray-200">{userProfile?.xp || 0}</span>
+                </div>
+              </div>
+
+              {/* Avatar & Dropdown Cá nhân */}
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  className="flex items-center gap-1 p-1 rounded-full border-2 border-primary/20 hover:border-primary transition-all bg-white dark:bg-gray-900"
+                >
+                  <img 
+                    src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user.email}`} 
+                    alt="avatar" 
+                    className="size-9 rounded-full object-cover" 
+                  />
+                  <span className={`material-symbols-outlined text-slate-400 transition-transform ${isUserDropdownOpen ? 'rotate-180' : ''}`}>
+                    expand_more
+                  </span>
+                </button>
+
+                {/* Dropdown Menu (Chứa Hồ sơ & Đăng xuất) */}
+                {isUserDropdownOpen && (
+                  <div className="absolute right-0 mt-3 w-60 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-800 py-4 z-[110] animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-6 py-3 border-b border-gray-50 dark:border-gray-800 mb-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tài khoản</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user.email}</p>
+                    </div>
+                    
+                    <Link href="/profile" onClick={() => setIsUserDropdownOpen(false)} className="flex items-center gap-3 px-6 py-3.5 hover:bg-primary/5 text-slate-700 dark:text-gray-300 font-bold text-sm">
+                      <span className="material-symbols-outlined text-primary">person</span> Hồ sơ cá nhân
+                    </Link>
+
+                    {isAdmin && (
+                      <Link href="/admin" onClick={() => setIsUserDropdownOpen(false)} className="flex items-center gap-3 px-6 py-3.5 hover:bg-rose-50 text-rose-500 font-bold text-sm">
+                        <span className="material-symbols-outlined">admin_panel_settings</span> Quản trị viên
+                      </Link>
+                    )}
+
+                    <div className="h-px bg-gray-50 dark:bg-gray-800 my-2 mx-4" />
+                    
+                    <button onClick={() => { supabase.auth.signOut(); window.location.href = '/'; }} className="w-full flex items-center gap-3 px-6 py-3.5 hover:bg-red-50 text-red-500 font-bold text-sm transition-colors">
+                      <span className="material-symbols-outlined">logout</span> Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : !loading && (
+            <Link href="/auth" className="px-8 py-3 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-primary/20 hover:scale-105 transition-all inline-block">
+              Đăng nhập
+            </Link>
+          )}
+
+          {/* Nút Mobile Menu */}
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden size-11 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
+            <span className="material-symbols-outlined">{isMobileMenuOpen ? 'close' : 'menu'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* MOBILE MENU (Floating Card) */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-[120] flex flex-col items-center justify-start pt-24 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="relative w-[90%] max-w-sm bg-white dark:bg-gray-900 rounded-[3rem] p-6 shadow-2xl animate-in slide-in-from-top-10 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="space-y-1">
+              {navLinks.map(link => (
+                <Link key={link.href} href={link.href} onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
+                    pathname === link.href ? 'bg-primary text-white shadow-lg' : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined">{link.icon}</span> {link.name}
+                </Link>
+              ))}
+            </div>
+            {user && (
+              <button onClick={() => { supabase.auth.signOut(); window.location.href = '/'; }} className="w-full flex items-center gap-4 px-6 py-4 mt-4 rounded-2xl font-bold text-red-500 hover:bg-red-50">
+                <span className="material-symbols-outlined">logout</span> Đăng xuất
+              </button>
+            )}
           </div>
-        </>
+        </div>
       )}
     </header>
   );
