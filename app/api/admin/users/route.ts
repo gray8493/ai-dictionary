@@ -281,11 +281,22 @@ export async function DELETE(request: NextRequest) {
       }
     });
 
-    // Delete user from Auth (will cascade to profiles if configured, or we can do it manually)
+    // Delete related data first to satisfy foreign key constraints
+    await supabaseAdmin
+      .from('vocabularies')
+      .delete()
+      .eq('user_id', userId);
+
+    await supabaseAdmin
+      .from('user_profiles')
+      .delete()
+      .eq('user_id', userId);
+
+    // Then delete user from Auth
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 400 });
+      return NextResponse.json({ error: 'Auth deletion failed: ' + deleteError.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
