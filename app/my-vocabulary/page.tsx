@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
+import Navbar from '@/components/Navbar';
 
 interface VocabularyItem {
   id: string;
@@ -15,16 +16,7 @@ interface VocabularyItem {
   status: string;
 }
 
-/** * 1. LOCAL COMPONENT: NAV_ITEM
- */
-const NavItem = ({ href, label, active = false }: { href: string; label: string; active?: boolean }) => (
-  <Link
-    href={href}
-    className={`text-sm font-medium transition-colors ${active ? 'text-primary font-bold' : 'text-slate-600 dark:text-gray-400 hover:text-primary'}`}
-  >
-    {label}
-  </Link>
-);
+
 
 /** * MAIN PAGE: MY VOCABULARY MANAGEMENT
  */
@@ -53,7 +45,6 @@ export default function MyVocabularyPage() {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isTypeColumnMissing, setIsTypeColumnMissing] = useState<boolean>(false);
-  const [updatingTypes, setUpdatingTypes] = useState<boolean>(false);
 
   // Update vocabulary status
   const updateVocabularyStatus = async (id: string, newStatus: string) => {
@@ -250,32 +241,7 @@ export default function MyVocabularyPage() {
     }
   };
 
-  const handleAutoFillTypes = async () => {
-    try {
-      setUpdatingTypes(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
 
-      const response = await fetch('/api/my-vocabulary/auto-fill-types', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`Đã cập nhật thành công ${result.updatedCount} từ vựng!`);
-        fetchVocabularies(currentPage);
-      } else {
-        alert("Có lỗi xảy ra khi tự động cập nhật.");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdatingTypes(false);
-    }
-  };
 
   useEffect(() => {
     if (user) {
@@ -294,57 +260,12 @@ export default function MyVocabularyPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, user]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
+
 
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background-light dark:bg-background-dark font-display">
-        {/* Header / Navbar */}
-        <header className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white/50 dark:bg-black/20 backdrop-blur-md sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
-              <span className="material-symbols-outlined text-[20px]">school</span>
-            </div>
-            <h2 className="text-xl font-bold dark:text-white">VocaAI</h2>
-          </div>
-          <nav className="hidden md:flex gap-8">
-            <NavItem href="/" label="Home" />
-            <NavItem href="/vocabulary" label="Tra từ" />
-            <NavItem href="/my-vocabulary" label="Từ của tôi" active />
-            <NavItem href="/practice" label="Luyện tập" />
-            <NavItem href="/leaderboard" label="Bảng xếp hạng" />
-          </nav>
-          <div className="flex items-center gap-4">
-            {user && userProfile && (
-              <div className="hidden md:flex items-center gap-4 mr-4">
-                <div className="flex items-center gap-2 bg-yellow-100 dark:bg-yellow-900/30 px-3 py-1 rounded-full">
-                  <span className="text-yellow-600 dark:text-yellow-400 text-sm">⭐</span>
-                  <span className="text-yellow-800 dark:text-yellow-200 font-bold">
-                    Level {userProfile.level}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 px-3 py-1 rounded-full">
-                  <span className="text-blue-600 dark:text-blue-400 text-sm">⚡</span>
-                  <span className="text-blue-800 dark:text-blue-200 font-bold">
-                    {userProfile.xp} XP
-                  </span>
-                </div>
-              </div>
-            )}
-            {user ? (
-              <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                Đăng xuất
-              </button>
-            ) : (
-              <Link href="/auth" className="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90">
-                Đăng nhập
-              </Link>
-            )}
-          </div>
-        </header>
+        <Navbar />
 
         <main className="max-w-6xl mx-auto p-6 md:p-10">
           {/* Page Title & Stats */}
@@ -377,19 +298,6 @@ export default function MyVocabularyPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleAutoFillTypes}
-                disabled={updatingTypes || isTypeColumnMissing}
-                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-gray-200 px-4 py-3 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
-              >
-                <span className={`material-symbols-outlined ${updatingTypes ? 'animate-spin' : ''}`}>
-                  {updatingTypes ? 'sync' : 'magic_button'}
-                </span>
-                {updatingTypes ? 'Đang cập nhật...' : 'Cập nhật loại từ'}
-              </button>
-              <button className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-primary/20 hover:opacity-90">
-                <span className="material-symbols-outlined">school</span> Học ngay
-              </button>
             </div>
           </div>
 
