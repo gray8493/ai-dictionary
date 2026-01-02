@@ -56,9 +56,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch vocabularies', details: error }, { status: 500 });
     }
 
+    let isTypeColumnMissing = false;
+    if (data && data.length > 0 && data[0].type === undefined) {
+      isTypeColumnMissing = true;
+    }
+
     return NextResponse.json({
       success: true,
       data: data || [],
+      isTypeColumnMissing,
       pagination: {
         page,
         limit,
@@ -76,10 +82,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     console.log('Request body:', body);
-    const { word, ipa, definition } = body;
+    const { word, ipa, definition, meaning, type } = body;
+    const finalMeaning = meaning || definition;
 
-    if (!word || !definition) {
-      return NextResponse.json({ error: 'Word and definition are required' }, { status: 400 });
+    if (!word || !finalMeaning) {
+      return NextResponse.json({ error: 'Word and meaning are required' }, { status: 400 });
     }
 
     // Get user from session
@@ -109,13 +116,31 @@ export async function POST(req: NextRequest) {
       ? createClient(supabaseUrl, supabaseServiceKey)
       : supabase;
 
-    console.log('Upserting:', { word, ipa: ipa || '', meaning: definition, user_id: user.id, status: 'learning' });
-    const { data, error } = await insertClient
+    console.log('Upserting:', { word, ipa: ipa || '', meaning: finalMeaning, type: type || 'word', user_id: user.id, status: 'learning' });
+
+    let upsertData: any = {
+      word,
+      ipa: ipa || '',
+      meaning: finalMeaning,
+      type: type || (word.trim().includes(' ') ? 'phrase' : 'word'),
+      user_id: user.id,
+      status: 'learning'
+    };
+
+    let { data, error } = await insertClient
       .from('vocabularies')
-      .upsert(
-        { word, ipa: ipa || '', meaning: definition, user_id: user.id, status: 'learning' },
-        { onConflict: 'user_id,word' }
-      );
+      .upsert(upsertData, { onConflict: 'user_id,word' });
+
+    // Fallback if 'type' column doesn't exist yet
+    if (error && error.message.includes('column "type" of relation "vocabularies" does not exist')) {
+      console.log('Falling back: "type" column missing. Removing from upsert.');
+      const { type, ...dataWithoutType } = upsertData;
+      const retry = await insertClient
+        .from('vocabularies')
+        .upsert(dataWithoutType, { onConflict: 'user_id,word' });
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Supabase error:', error);

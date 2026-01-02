@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       
       TRẢ VỀ KẾT QUẢ DƯỚI DẠNG JSON NHƯ SAU:
       {
-        "Easy": [{"word": "...", "ipa": "...", "definition": "..."}],
+        "Easy": [{"word": "...", "ipa": "...", "definition": "...", "type": "noun/verb/adjective/adverb"}],
         "Medium": [...],
         "Hard": [...]
       }
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     const cleanJson = text.replace(/```json|```/g, "").trim();
-    
+
     return NextResponse.json(JSON.parse(cleanJson));
   } catch (error: any) {
     console.error("Extract vocab error:", error);

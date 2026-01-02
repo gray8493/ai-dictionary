@@ -7,7 +7,20 @@ import { supabase } from '@/lib/supabase';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 
-const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) => {
+const typeMapping: { [key: string]: string } = {
+  'noun': 'Danh từ',
+  'verb': 'Động từ',
+  'adjective': 'Tính từ',
+  'adverb': 'Trạng từ',
+  'pronoun': 'Đại từ',
+  'preposition': 'Giới từ',
+  'conjunction': 'Liên từ',
+  'interjection': 'Thán từ',
+  'word': 'Từ vựng',
+  'phrase': 'Cụm từ'
+};
+
+const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl, type }: any) => {
   const playAudio = () => {
     if (audioUrl) {
       new Audio(audioUrl).play();
@@ -18,10 +31,15 @@ const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) 
 
   return (
     <div className="flex flex-col @xl:flex-row bg-white dark:bg-gray-800/50 p-6 rounded-lg gap-6 shadow-sm">
-      <div className="w-full @xl:w-1/3 aspect-video rounded-lg bg-cover bg-center" style={{backgroundImage: `url(${img})`}}></div>
+      <div className="w-full @xl:w-1/3 aspect-video rounded-lg bg-cover bg-center" style={{ backgroundImage: `url(${img})` }}></div>
       <div className="flex-1 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <span className="text-2xl font-bold dark:text-white">{word}</span>
+          {type && (
+            <span className="text-sm px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded-md text-slate-500 italic">
+              ({type.split(', ').map((t: string) => typeMapping[t.toLowerCase()] || t).join(', ')})
+            </span>
+          )}
           <span className="text-gray-500">{ipa}</span>
           <button onClick={playAudio} className="text-primary hover:scale-110 transition-transform">
             <span className="material-symbols-outlined">volume_up</span>
@@ -31,7 +49,7 @@ const VocabCard = ({ word, ipa, meaning, example, img, onSave, audioUrl }: any) 
         <p className="text-sm italic text-gray-500">Example: {example}</p>
         <div className="flex justify-end">
           <button
-            onClick={() => onSave({ word, ipa, meaning, example })}
+            onClick={() => onSave({ word, ipa, meaning, example, type })}
             className="bg-primary text-white px-5 py-2 rounded-full text-sm flex items-center gap-2 hover:bg-opacity-90 transition-all"
           >
             <span className="material-symbols-outlined text-sm">bookmark_add</span> Lưu từ
@@ -77,7 +95,13 @@ export default function VocabularyPage() {
         const data = await res.json();
         if (res.ok) {
           const entry = data[0];
-          const englishMeaning = entry.meanings[0].definitions[0].definition;
+          // Lấy tất cả loại từ
+          const allTypes = Array.from(new Set(entry.meanings.map((m: any) => m.partOfSpeech))).join(', ');
+
+          // Ưu tiên lấy định nghĩa của verb nếu có, nếu không lấy cái đầu tiên
+          const verbMeaning = entry.meanings.find((m: any) => m.partOfSpeech === 'verb');
+          const primaryMeaning = verbMeaning || entry.meanings[0];
+          const englishMeaning = primaryMeaning.definitions[0].definition;
 
           // Translate meaning to Vietnamese
           let vietnameseMeaning = englishMeaning;
@@ -102,9 +126,10 @@ export default function VocabularyPage() {
           setResult({
             word: entry.word,
             ipa: entry.phonetic || entry.phonetics.find((p: any) => p.text)?.text || "",
+            type: allTypes,
             meaning: vietnameseMeaning,
             englishMeaning: englishMeaning, // Keep original for reference
-            example: entry.meanings[0].definitions[0].example || "No example available.",
+            example: primaryMeaning.definitions[0].example || "No example available.",
             audioUrl: entry.phonetics.find((p: any) => p.audio !== "")?.audio || "",
             img: `https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=500`
           });
@@ -156,30 +181,38 @@ export default function VocabularyPage() {
   };
 
   const handleSaveWord = async (wordData: any) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (!user) {
-      setMessage("Vui lòng đăng nhập để lưu từ vựng!");
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
+      if (!session) {
+        setMessage("Vui lòng đăng nhập để lưu từ vựng!");
+        setTimeout(() => setMessage(''), 3000);
+        return;
+      }
 
-    const { error } = await supabase
-      .from('vocabularies')
-      .insert([
-        {
-          user_id: user.id,
+      const response = await fetch('/api/my-vocabulary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           word: wordData.word,
           ipa: wordData.ipa || '',
           meaning: wordData.meaning,
-        }
-      ]);
+          type: wordData.type || 'word'
+        }),
+      });
 
-    if (error) {
-      setMessage("Lỗi: " + error.message);
-      setTimeout(() => setMessage(''), 3000);
-    } else {
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Lỗi khi lưu từ");
+      }
+
       setMessage("Đã lưu thành công!");
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err: any) {
+      setMessage("Lỗi: " + err.message);
       setTimeout(() => setMessage(''), 3000);
     }
   };
@@ -201,21 +234,19 @@ export default function VocabularyPage() {
               <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                 <button
                   onClick={() => setMode('word')}
-                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'word'
-                      ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                  }`}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${mode === 'word'
+                    ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
                 >
                   Tra cứu từ vựng
                 </button>
                 <button
                   onClick={() => setMode('translate')}
-                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
-                    mode === 'translate'
-                      ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                  }`}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${mode === 'translate'
+                    ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
                 >
                   Dịch văn bản
                 </button>

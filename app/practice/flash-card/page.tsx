@@ -7,6 +7,19 @@ import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import AuthGuard from '@/components/AuthGuard';
 
+const typeMapping: { [key: string]: string } = {
+    'noun': 'Danh từ',
+    'verb': 'Động từ',
+    'adjective': 'Tính từ',
+    'adverb': 'Trạng từ',
+    'pronoun': 'Đại từ',
+    'preposition': 'Giới từ',
+    'conjunction': 'Liên từ',
+    'interjection': 'Thán từ',
+    'word': 'Từ vựng',
+    'phrase': 'Cụm từ'
+};
+
 export default function FlashCardPage() {
     const [vocabularyList, setVocabularyList] = useState<any[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -175,7 +188,14 @@ export default function FlashCardPage() {
                                         <h2 className="text-5xl font-black text-slate-800 dark:text-white uppercase tracking-tight mb-2">
                                             {currentWord.word}
                                         </h2>
-                                        <p className="text-xl text-slate-400 font-medium italic">/{currentWord.ipa}/</p>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <p className="text-xl text-slate-400 font-medium italic">/{currentWord.ipa}/</p>
+                                            {currentWord.type && (
+                                                <span className="text-xs px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-400 italic">
+                                                    ({typeMapping[currentWord.type.toLowerCase()] || currentWord.type})
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); speak(currentWord.word); }}

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
       TRẢ VỀ KẾT QUẢ DƯỚI DẠNG JSON NHƯ SAU:
       {
-        "Easy": [{"word": "...", "ipa": "...", "definition": "..."}],
+        "Easy": [{"word": "...", "ipa": "...", "definition": "...", "type": "noun/verb/adjective/adverb"}],
         "Medium": [...],
         "Hard": [...]
       }
